@@ -14,27 +14,29 @@ pub fn main() anyerror!void {
 
   // Fill with background color
   // Byte-by-byte to avoid endianness concerns
+
+  // Normalised range [0, 1]
   const xRange: f32 = @intToFloat(f32, IMAGE_WIDTH - 1);
   const yRange: f32 = @intToFloat(f32, IMAGE_HEIGHT - 1);
-  const componentsPerRow = NUM_COMPONENTS * IMAGE_WIDTH;
 
+  // Scale pixel coordinate in range [0, 255]
+  const xScale: f32 = 255.0 / xRange;
+  const yScale: f32 = 255.0 / yRange;
+
+  const componentsPerRow = NUM_COMPONENTS * IMAGE_WIDTH;
   for (pixels) |*item, it|
   {
     const i = @intCast(u32, it);
     // The current pixel's coordinate position (row, col)
-    const row:u32 = i / componentsPerRow;
-    const col:u32 = (i % componentsPerRow) / NUM_COMPONENTS;
-
-    // The current pixel's normalised position [0, 1]
-    const x:f32 = @intToFloat(f32, col) / xRange;
-    const y:f32 = @intToFloat(f32, row) / yRange;
+    const row:f32 = @intToFloat(f32, i / componentsPerRow);
+    const col:f32 = @intToFloat(f32, (i % componentsPerRow) / NUM_COMPONENTS);
 
     // std.debug.warn("Col:{}, Row:{}, X:{}, Y{}\n", .{col, row, x, y});
     const channel = i % NUM_COMPONENTS;
     item.* = switch (channel)
     {
-      0 => @floatToInt(u8, x * 255.0),  // Red
-      1 => @floatToInt(u8, y * 255.0),  // Green
+      0 => @floatToInt(u8, col * xScale),  // Red
+      1 => @floatToInt(u8, row * yScale),  // Green
       2 => 0x30,  // Blue
       3 => 0xff,  // Alpha
       else => 0x00,
