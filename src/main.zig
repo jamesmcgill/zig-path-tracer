@@ -4,16 +4,24 @@ const c = @cImport({
 const std = @import("std");
 
 //------------------------------------------------------------------------------
+const Color = packed struct {
+    red: u8,
+    green: u8,
+    blue: u8,
+    alpha: u8,
+
+  pub const NUM_COMPONENTS: u32 = 4;
+};
+
+//------------------------------------------------------------------------------
 pub fn main() anyerror!void {
   const IMAGE_FILENAME = "test.bmp";
   const IMAGE_WIDTH: u32 = 256;
   const IMAGE_HEIGHT: u32 = 256;
-  const NUM_COMPONENTS: u32 = 4;
 
-  var pixels: [IMAGE_WIDTH * IMAGE_HEIGHT * NUM_COMPONENTS]u8 = undefined;
+  var pixels: [IMAGE_WIDTH * IMAGE_HEIGHT]Color = undefined;
 
   // Fill with background color
-  // Byte-by-byte to avoid endianness concerns
 
   // Normalised range [0, 1]
   const xRange: f32 = @intToFloat(f32, IMAGE_WIDTH - 1);
@@ -23,24 +31,20 @@ pub fn main() anyerror!void {
   const xScale: f32 = 255.0 / xRange;
   const yScale: f32 = 255.0 / yRange;
 
-  const componentsPerRow = NUM_COMPONENTS * IMAGE_WIDTH;
   for (pixels) |*item, it|
   {
     const i = @intCast(u32, it);
+
     // The current pixel's coordinate position (row, col)
-    const row:f32 = @intToFloat(f32, i / componentsPerRow);
-    const col:f32 = @intToFloat(f32, (i % componentsPerRow) / NUM_COMPONENTS);
+    const col: f32 = @intToFloat(f32, i % IMAGE_WIDTH);
+    const row: f32 = @intToFloat(f32, i / IMAGE_WIDTH);
+
+    item.red = @floatToInt(u8, col * xScale);
+    item.green = @floatToInt(u8, row * yScale);
+    item.blue  = 0x30;
+    item.alpha = 0xFF;
 
     // std.debug.warn("Col:{}, Row:{}, X:{}, Y{}\n", .{col, row, x, y});
-    const channel = i % NUM_COMPONENTS;
-    item.* = switch (channel)
-    {
-      0 => @floatToInt(u8, col * xScale),  // Red
-      1 => @floatToInt(u8, row * yScale),  // Green
-      2 => 0x30,  // Blue
-      3 => 0xff,  // Alpha
-      else => 0x00,
-    };
   }
 
   // Save the image to a file
@@ -48,7 +52,7 @@ pub fn main() anyerror!void {
     IMAGE_FILENAME,
     @as(c_int, IMAGE_WIDTH),
     @as(c_int, IMAGE_HEIGHT),
-    @as(c_int, NUM_COMPONENTS),
+    @as(c_int, Color.NUM_COMPONENTS),
     @ptrCast(*const c_void, &pixels[0])
   );
 
