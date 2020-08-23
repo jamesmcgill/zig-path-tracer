@@ -2,6 +2,8 @@ const c = @cImport({
   @cInclude("stb_image_write.h");
 });
 const std = @import("std");
+const Vec3 = @import("Vec3.zig").Vec3;
+const Ray = @import("Ray.zig").Ray;
 
 //------------------------------------------------------------------------------
 const Color = packed struct {
@@ -14,44 +16,72 @@ const Color = packed struct {
 };
 
 //------------------------------------------------------------------------------
+pub fn calcColor(ray: Ray) Vec3 {
+  const unit_direction = ray.direction.normalized();
+  const t: f32 = (unit_direction.y + 1.0) * 0.5;
+
+  const white_tone = Vec3.init(1.0, 1.0, 1.0).scale(1.0 - t);
+  const blue_tone = Vec3.init(0.5, 0.7, 1.0).scale(t);
+  return white_tone.add(blue_tone);
+}
+
+//------------------------------------------------------------------------------
 pub fn main() anyerror!void {
-  const IMAGE_FILENAME = "test.bmp";
-  const IMAGE_WIDTH: u32 = 256;
-  const IMAGE_HEIGHT: u32 = 256;
+  // Output image details
+  const image_filename = "test.bmp";
+  const image_width: u32 = 256;
+  const image_height: u32 = 256;
 
-  var pixels: [IMAGE_WIDTH * IMAGE_HEIGHT]Color = undefined;
+  var pixels: [image_width * image_height]Color = undefined;
 
-  // Fill with background color
+  // Frustum extents
+  const frustum_width: f32 = 200.0;
+  const frustum_height: f32 = 200.0;
+  const frustum_dist: f32 = 100.0;
 
-  // Normalised range [0, 1]
-  const x_range: f32 = @intToFloat(f32, IMAGE_WIDTH - 1);
-  const y_range: f32 = @intToFloat(f32, IMAGE_HEIGHT - 1);
+  // Scale image (screen) to world space
+  const x_scale: f32 = frustum_width / @intToFloat(f32, image_width - 1);
+  const y_scale: f32 = frustum_height / @intToFloat(f32, image_height - 1);
 
-  // Scale pixel coordinate in range [0, 255]
-  const x_scale: f32 = 255.0 / x_range;
-  const y_scale: f32 = 255.0 / y_range;
+  // Center image at x=0, y=0
+  const x_offset: f32 = -frustum_width / 2.0;
+  const y_offset: f32 = -frustum_height / 2.0;
+
+  // Ray casting from origin
+  const ray_origin = Vec3 {.x = 0.0, .y = 0.0, .z = 0.0};
 
   for (pixels) |*item, it|
   {
     const i = @intCast(u32, it);
 
     // The current pixel's coordinate position (row, col)
-    const col: f32 = @intToFloat(f32, i % IMAGE_WIDTH);
-    const row: f32 = @intToFloat(f32, i / IMAGE_WIDTH);
+    const col: f32 = @intToFloat(f32, i % image_width);
+    const row: f32 = @intToFloat(f32, i / image_width);
 
-    item.red = @floatToInt(u8, col * x_scale);
-    item.green = @floatToInt(u8, row * y_scale);
-    item.blue  = 0x30;
+    // The point that corresponds to on the frustum plane
+    const to_x: f32 = x_offset + (col * x_scale);
+    const to_y: f32 = y_offset + (row * y_scale);
+    const to_pixel: Vec3 = Vec3.init(to_x, to_y, frustum_dist);
+
+    const ray_dir: Vec3 = to_pixel.subtract(ray_origin);
+    const ray = Ray.init(ray_origin, ray_dir);
+
+    const color: Vec3 = calcColor(ray);
+    item.red = @floatToInt(u8, color.x * 255.0);
+    item.green = @floatToInt(u8, color.y * 255.0);
+    item.blue = @floatToInt(u8, color.z * 255.0);
     item.alpha = 0xFF;
 
-    // std.debug.warn("Col:{}, Row:{}, X:{}, Y{}\n", .{col, row, x, y});
+//    std.debug.warn("Col:{}, Row:{}, R:{}, G{}, B{}\n",
+//      .{@floatToInt(u32, col), @floatToInt(u32, row),
+//      item.red, item.green, item.blue});
   }
 
   // Save the image to a file
   var f = c.stbi_write_bmp(
-    IMAGE_FILENAME,
-    @as(c_int, IMAGE_WIDTH),
-    @as(c_int, IMAGE_HEIGHT),
+    image_filename,
+    @as(c_int, image_width),
+    @as(c_int, image_height),
     @as(c_int, Color.NUM_COMPONENTS),
     @ptrCast(*const c_void, &pixels[0])
   );
