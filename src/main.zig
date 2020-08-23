@@ -24,12 +24,12 @@ pub fn main() anyerror!void {
   // Fill with background color
 
   // Normalised range [0, 1]
-  const xRange: f32 = @intToFloat(f32, IMAGE_WIDTH - 1);
-  const yRange: f32 = @intToFloat(f32, IMAGE_HEIGHT - 1);
+  const x_range: f32 = @intToFloat(f32, IMAGE_WIDTH - 1);
+  const y_range: f32 = @intToFloat(f32, IMAGE_HEIGHT - 1);
 
   // Scale pixel coordinate in range [0, 255]
-  const xScale: f32 = 255.0 / xRange;
-  const yScale: f32 = 255.0 / yRange;
+  const x_scale: f32 = 255.0 / x_range;
+  const y_scale: f32 = 255.0 / y_range;
 
   for (pixels) |*item, it|
   {
@@ -39,8 +39,8 @@ pub fn main() anyerror!void {
     const col: f32 = @intToFloat(f32, i % IMAGE_WIDTH);
     const row: f32 = @intToFloat(f32, i / IMAGE_WIDTH);
 
-    item.red = @floatToInt(u8, col * xScale);
-    item.green = @floatToInt(u8, row * yScale);
+    item.red = @floatToInt(u8, col * x_scale);
+    item.green = @floatToInt(u8, row * y_scale);
     item.blue  = 0x30;
     item.alpha = 0xFF;
 
