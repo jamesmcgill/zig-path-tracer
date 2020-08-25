@@ -1,4 +1,4 @@
-const c = @cImport({
+const c_import = @cImport({
   @cInclude("stb_image_write.h");
 });
 const std = @import("std");
@@ -16,7 +16,29 @@ const Color = packed struct {
 };
 
 //------------------------------------------------------------------------------
+pub fn hitsSphere(ray: Ray) bool {
+  const sphere_pos = Vec3.init(0.0, 0.0, 110.0);
+  const sphere_radius = 50.0;
+
+  const displacement = ray.origin.subtract(sphere_pos);
+
+  const a: f32 = Vec3.dot(ray.direction, ray.direction);
+  const b: f32 = 2.0 * Vec3.dot(displacement, ray.direction);
+  const c: f32 = Vec3.dot(displacement, displacement) -
+    (sphere_radius * sphere_radius);
+
+  const discriminant: f32 = (b * b) - (4.0 * a * c);
+  return (discriminant > 0.0);
+}
+
+//------------------------------------------------------------------------------
 pub fn calcColor(ray: Ray) Vec3 {
+  if (hitsSphere(ray))
+  {
+    return Vec3.init(1.0, 0.0, 0.0);
+  }
+
+  // Draw background
   const unit_direction = ray.direction.normalized();
   const t: f32 = (unit_direction.y + 1.0) * 0.5;
 
@@ -78,7 +100,7 @@ pub fn main() anyerror!void {
   }
 
   // Save the image to a file
-  var f = c.stbi_write_bmp(
+  var f = c_import.stbi_write_bmp(
     image_filename,
     @as(c_int, image_width),
     @as(c_int, image_height),
