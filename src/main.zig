@@ -28,7 +28,7 @@ pub fn hitsSphere(ray: Ray) bool {
     (sphere_radius * sphere_radius);
 
   const discriminant: f32 = (b * b) - (4.0 * a * c);
-  return (discriminant > 0.0);
+  return (discriminant >= 0.0);
 }
 
 //------------------------------------------------------------------------------
