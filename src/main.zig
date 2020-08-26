@@ -42,8 +42,8 @@ pub fn calcColor(ray: Ray) Vec3 {
   const unit_direction = ray.direction.normalized();
   const t: f32 = (unit_direction.y + 1.0) * 0.5;
 
-  const white_tone = Vec3.init(1.0, 1.0, 1.0).scale(1.0 - t);
-  const blue_tone = Vec3.init(0.5, 0.7, 1.0).scale(t);
+  const white_tone = Vec3.init(1.0, 1.0, 1.0).scale(t);
+  const blue_tone = Vec3.init(0.5, 0.7, 1.0).scale(1.0 - t);
   return white_tone.add(blue_tone);
 }
 
