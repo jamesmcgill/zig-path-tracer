@@ -14,7 +14,7 @@ pub const Ray = struct {
 
     //--------------------------------------------------------------------------
     pub fn pointAtT(self: Ray, t: f32) Vec3 {
-        return origin.add(direction.scale(t));
+        return self.origin.add(self.direction.scale(t));
     }
 
     //--------------------------------------------------------------------------

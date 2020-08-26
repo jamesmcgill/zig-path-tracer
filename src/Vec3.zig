@@ -33,6 +33,24 @@ pub const Vec3 = struct {
     }
 
     //--------------------------------------------------------------------------
+    pub fn addScalar(self: Vec3, val: f32) Vec3 {
+        return Vec3{
+            .x = self.x + val,
+            .y = self.y + val,
+            .z = self.z + val,
+        };
+    }
+
+    //--------------------------------------------------------------------------
+    pub fn subtractScalar(self: Vec3, val: f32) Vec3 {
+        return Vec3{
+            .x = self.x - val,
+            .y = self.y - val,
+            .z = self.z - val,
+        };
+    }
+
+    //--------------------------------------------------------------------------
     pub fn scale(self: Vec3, scalar: f32) Vec3 {
         return Vec3{
             .x = self.x * scalar,
@@ -54,6 +72,13 @@ pub const Vec3 = struct {
     //--------------------------------------------------------------------------
     pub fn normalized(self: Vec3) Vec3 {
         return self.scale(1.0 / self.length());
+    }
+
+    //--------------------------------------------------------------------------
+    // Scale a normalized vector in range [-1, 1] to range [0, 1]
+    //--------------------------------------------------------------------------
+    pub fn rescaled(self: Vec3) Vec3 {
+        return self.addScalar(1.0).scale(0.5);
     }
 
     //--------------------------------------------------------------------------

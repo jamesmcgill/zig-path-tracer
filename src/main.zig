@@ -2,6 +2,8 @@ const c_import = @cImport({
   @cInclude("stb_image_write.h");
 });
 const std = @import("std");
+const math = @import("std").math;
+
 const Vec3 = @import("Vec3.zig").Vec3;
 const Ray = @import("Ray.zig").Ray;
 
@@ -16,7 +18,14 @@ const Color = packed struct {
 };
 
 //------------------------------------------------------------------------------
-pub fn hitsSphere(ray: Ray) bool {
+const CollisionInfo = struct {
+    point: Vec3,
+    t: f32,
+    surface_normal: Vec3,
+};
+
+//------------------------------------------------------------------------------
+pub fn hitsSphere(ray: Ray) ?CollisionInfo {
   const sphere_pos = Vec3.init(0.0, 0.0, 110.0);
   const sphere_radius = 50.0;
 
@@ -28,14 +37,42 @@ pub fn hitsSphere(ray: Ray) bool {
     (sphere_radius * sphere_radius);
 
   const discriminant: f32 = (b * b) - (4.0 * a * c);
-  return (discriminant >= 0.0);
+  if (discriminant < 0.0)
+  {
+    return null;
+  }
+
+  const discrim_root = math.sqrt(discriminant);
+  const double_a = 2.0 * a;
+  const t1 = (-b + discrim_root) / double_a;
+  const t2 = (-b - discrim_root) / double_a;
+
+  // Determine closest t
+  var t = t1;
+  if (t2 < t1 and t2 >= 0.0)
+  {
+    t = t2;
+  }
+  if (t < 0.0)
+  {
+    return null;
+  }
+
+  const point_at_t = ray.pointAtT(t);
+  const info = CollisionInfo {
+    .point = point_at_t,
+    .t = t,
+    .surface_normal = point_at_t.subtract(sphere_pos),
+  };
+
+  return info;
 }
 
 //------------------------------------------------------------------------------
 pub fn calcColor(ray: Ray) Vec3 {
-  if (hitsSphere(ray))
+  if (hitsSphere(ray)) |info|
   {
-    return Vec3.init(1.0, 0.0, 0.0);
+    return info.surface_normal.normalized().rescaled();
   }
 
   // Draw background
