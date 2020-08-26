@@ -1,2 +1,5 @@
 zig-cache/
+*.swp
+test.bmp
+test_reference.bmp
 
