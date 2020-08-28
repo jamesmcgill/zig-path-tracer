@@ -19,7 +19,7 @@ const Color = packed struct
 };
 
 //------------------------------------------------------------------------------
-const CollisionInfo = struct
+const HitInfo = struct
 {
     point: Vec3,
     t: f32,
@@ -33,7 +33,7 @@ const Sphere = struct
     radius: f32,
     color: Vec3,
 
-    pub fn hitTest(self: Sphere, ray: Ray, t_min: f32, t_max: f32) ?CollisionInfo
+    pub fn hitTest(self: Sphere, ray: Ray, t_min: f32, t_max: f32) ?HitInfo
     {
       const displacement = ray.origin.subtract(self.position);
 
@@ -53,7 +53,7 @@ const Sphere = struct
       if (closestValidT(t1, t2, t_min, t_max)) |t|
       {
         const point_at_t = ray.pointAtT(t);
-        return CollisionInfo
+        return HitInfo
         {
           .point = point_at_t,
           .t = t,
