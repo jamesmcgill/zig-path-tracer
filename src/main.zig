@@ -10,10 +10,10 @@ const Ray = @import("Ray.zig").Ray;
 //------------------------------------------------------------------------------
 const Color = packed struct
 {
-    red: u8,
-    green: u8,
-    blue: u8,
-    alpha: u8,
+  red: u8,
+  green: u8,
+  blue: u8,
+  alpha: u8,
 
   pub const NUM_COMPONENTS: u32 = 4;
 };
@@ -21,74 +21,94 @@ const Color = packed struct
 //------------------------------------------------------------------------------
 const HitInfo = struct
 {
-    point: Vec3,
-    t: f32,
-    surface_normal: Vec3,
+  point: Vec3,
+  t: f32,
+  surface_normal: Vec3,
+};
+
+//------------------------------------------------------------------------------
+const Scene = struct
+{
+  spheres: []Sphere,
 };
 
 //------------------------------------------------------------------------------
 const Sphere = struct
 {
-    position: Vec3,
-    radius: f32,
-    color: Vec3,
+  position: Vec3,
+  radius: f32,
+  color: Vec3,
 
-    pub fn hitTest(self: Sphere, ray: Ray, t_min: f32, t_max: f32) ?HitInfo
+  pub fn hitTest(self: Sphere, ray: Ray, t_min: f32, t_max: f32) ?HitInfo
+  {
+    const displacement = ray.origin.subtract(self.position);
+
+    const a: f32 = Vec3.dot(ray.direction, ray.direction);
+    const b: f32 = 2.0 * Vec3.dot(displacement, ray.direction);
+    const c: f32 = Vec3.dot(displacement, displacement) -
+      (self.radius * self.radius);
+
+    const discriminant: f32 = (b * b) - (4.0 * a * c);
+    if (discriminant < 0.0) { return null; }
+
+    const discrim_root = math.sqrt(discriminant);
+    const double_a = 2.0 * a;
+    const t1 = (-b + discrim_root) / double_a;
+    const t2 = (-b - discrim_root) / double_a;
+
+    if (closestValidT(t1, t2, t_min, t_max)) |t|
     {
-      const displacement = ray.origin.subtract(self.position);
-
-      const a: f32 = Vec3.dot(ray.direction, ray.direction);
-      const b: f32 = 2.0 * Vec3.dot(displacement, ray.direction);
-      const c: f32 = Vec3.dot(displacement, displacement) -
-        (self.radius * self.radius);
-
-      const discriminant: f32 = (b * b) - (4.0 * a * c);
-      if (discriminant < 0.0) { return null; }
-
-      const discrim_root = math.sqrt(discriminant);
-      const double_a = 2.0 * a;
-      const t1 = (-b + discrim_root) / double_a;
-      const t2 = (-b - discrim_root) / double_a;
-
-      if (closestValidT(t1, t2, t_min, t_max)) |t|
+      const point_at_t = ray.pointAtT(t);
+      return HitInfo
       {
-        const point_at_t = ray.pointAtT(t);
-        return HitInfo
-        {
-          .point = point_at_t,
-          .t = t,
-          .surface_normal = point_at_t.subtract(self.position),
-        };
-      }
-      return null;
+        .point = point_at_t,
+        .t = t,
+        .surface_normal = point_at_t.subtract(self.position),
+      };
     }
+    return null;
+  }
 
-    pub fn isInRange(val: f32, min: f32, max: f32) bool
-    {
-      if (val < min) { return false; }
-      if (val > max) { return false; }
-      return true;
-    }
+  pub fn isInRange(val: f32, min: f32, max: f32) bool
+  {
+    if (val < min) { return false; }
+    if (val > max) { return false; }
+    return true;
+  }
 
-    pub fn closestValidT(t1: f32, t2: f32, t_min: f32, t_max: f32) ?f32
-    {
-      var isT1Valid = isInRange(t1, t_min, t_max);
-      var isT2Valid = isInRange(t2, t_min, t_max);
+  pub fn closestValidT(t1: f32, t2: f32, t_min: f32, t_max: f32) ?f32
+  {
+    var isT1Valid = isInRange(t1, t_min, t_max);
+    var isT2Valid = isInRange(t2, t_min, t_max);
 
-      if (!isT1Valid and !isT2Valid) { return null; }
-      if (isT1Valid and !isT2Valid) { return t1; }
-      if (isT2Valid and !isT1Valid) { return t2; }
+    if (!isT1Valid and !isT2Valid) { return null; }
+    if (isT1Valid and !isT2Valid) { return t1; }
+    if (isT2Valid and !isT1Valid) { return t2; }
 
-      return if (t1 < t2) t1 else t2;
-    }
+    return if (t1 < t2) t1 else t2;
+  }
 };
 
 //------------------------------------------------------------------------------
-pub fn calcColor(ray: Ray, sphere: Sphere) Vec3
+pub fn calcColor(ray: Ray, scene: Scene) Vec3
 {
-  if (sphere.hitTest(ray, 0.0, 100000.0)) |info|
+  // Test all objects in the scene
+  var hit_something: bool = false;
+  var closest_t: f32 = 100000.0;
+  var closest_hit: HitInfo = undefined;
+
+  for (scene.spheres) |sphere|
   {
-    return info.surface_normal.normalized().rescaled();
+    if (sphere.hitTest(ray, 0.0, closest_t)) |info|
+    {
+      hit_something = true;
+      closest_t = info.t;
+      closest_hit = info;
+    }
+  }
+  if (hit_something)
+  {
+    return closest_hit.surface_normal.normalized().rescaled();
   }
 
   // Draw background
@@ -109,11 +129,21 @@ pub fn main() anyerror!void
   const image_height: u32 = 256;
 
   // Scene objects
-  const sphere = Sphere
+  const scene = Scene
   {
-    .position = Vec3.init(0.0, 0.0, 110.0),
-    .radius = 50.0,
-    .color = Vec3.init(1.0, 0.0, 0.0),
+    .spheres = &[_]Sphere
+    {
+      .{
+        .position = Vec3.init(-30.0, 0.0, 110.0),
+        .radius = 20.0,
+        .color = Vec3.init(1.0, 0.0, 0.0),
+      },
+      .{
+        .position = Vec3.init(30.0, 0.0, 110.0),
+        .radius = 20.0,
+        .color = Vec3.init(1.0, 0.0, 0.0),
+      },
+    },
   };
 
   // Output image
@@ -151,15 +181,11 @@ pub fn main() anyerror!void
     const ray_dir: Vec3 = to_pixel.subtract(ray_origin);
     const ray = Ray.init(ray_origin, ray_dir);
 
-    const color: Vec3 = calcColor(ray, sphere);
+    const color: Vec3 = calcColor(ray, scene);
     item.red = @floatToInt(u8, color.x * 255.0);
     item.green = @floatToInt(u8, color.y * 255.0);
     item.blue = @floatToInt(u8, color.z * 255.0);
     item.alpha = 0xFF;
-
-//    std.debug.warn("Col:{}, Row:{}, R:{}, G{}, B{}\n",
-//      .{@floatToInt(u32, col), @floatToInt(u32, row),
-//      item.red, item.green, item.blue});
   }
 
   // Save the image to a file
