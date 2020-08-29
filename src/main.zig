@@ -8,6 +8,33 @@ const Vec3 = @import("Vec3.zig").Vec3;
 const Ray = @import("Ray.zig").Ray;
 
 //------------------------------------------------------------------------------
+// Return a random number in the range [0, 1)
+//------------------------------------------------------------------------------
+const MyRand = struct
+{
+  rng: std.rand.DefaultPrng,
+
+  pub fn create() MyRand
+  {
+    var buf: [8]u8 = undefined;
+    std.crypto.randomBytes(buf[0..]) catch |err|
+    {
+      std.debug.warn("ERROR couldn't seed RNG\n", .{});
+    };
+    const seed = std.mem.readIntNative(u64, buf[0..8]);
+
+    return MyRand {
+      .rng = std.rand.DefaultPrng.init(seed),
+    };
+  }
+
+  pub fn float(self: *MyRand) f32
+  {
+    return self.rng.random.float(f32);
+  }
+};
+
+//------------------------------------------------------------------------------
 const Color = packed struct
 {
   red: u8,
@@ -128,6 +155,10 @@ pub fn main() anyerror!void
   const image_width: u32 = 256;
   const image_height: u32 = 256;
 
+  // Rendering parameters
+  const num_samples: u32 = 100;
+  const num_samples_recip: f32 = 1.0 / @intToFloat(f32, num_samples);
+
   // Scene objects
   const scene = Scene
   {
@@ -145,6 +176,8 @@ pub fn main() anyerror!void
       },
     },
   };
+
+  var r = MyRand.create();
 
   // Output image
   var pixels: [image_width * image_height]Color = undefined;
@@ -167,21 +200,28 @@ pub fn main() anyerror!void
 
   for (pixels) |*item, it|
   {
-    const i = @intCast(u32, it);
+    const pix = @intCast(u32, it);
 
     // The current pixel's coordinate position (row, col)
-    const col: f32 = @intToFloat(f32, i % image_width);
-    const row: f32 = @intToFloat(f32, i / image_width);
+    const col: f32 = @intToFloat(f32, pix % image_width);
+    const row: f32 = @intToFloat(f32, pix / image_width);
 
-    // The point that corresponds to on the frustum plane
-    const to_x: f32 = x_offset + (col * x_scale);
-    const to_y: f32 = y_offset + (row * y_scale);
-    const to_pixel: Vec3 = Vec3.init(to_x, to_y, frustum_dist);
+    var color = Vec3 {.x = 0.0, .y = 0.0, .z = 0.0};
+    var samp: u32 = 0;
+    while (samp < num_samples) : (samp += 1)
+    {
+      // The point that corresponds to on the frustum plane
+      const to_x: f32 = x_offset + ((col + r.float()) * x_scale);
+      const to_y: f32 = y_offset + ((row + r.float()) * y_scale);
+      const to_pixel: Vec3 = Vec3.init(to_x, to_y, frustum_dist);
 
-    const ray_dir: Vec3 = to_pixel.subtract(ray_origin);
-    const ray = Ray.init(ray_origin, ray_dir);
+      const ray_dir: Vec3 = to_pixel.subtract(ray_origin);
+      const ray = Ray.init(ray_origin, ray_dir);
 
-    const color: Vec3 = calcColor(ray, scene);
+      color = color.add( calcColor(ray, scene) );
+    }
+
+    color = color.scale(num_samples_recip);
     item.red = @floatToInt(u8, color.x * 255.0);
     item.green = @floatToInt(u8, color.y * 255.0);
     item.blue = @floatToInt(u8, color.z * 255.0);
@@ -189,7 +229,7 @@ pub fn main() anyerror!void
   }
 
   // Save the image to a file
-  var f = c_import.stbi_write_bmp(
+  var ret = c_import.stbi_write_bmp(
     image_filename,
     @as(c_int, image_width),
     @as(c_int, image_height),
@@ -197,7 +237,11 @@ pub fn main() anyerror!void
     @ptrCast(*const c_void, &pixels[0])
   );
 
-  std.debug.warn("All your codebase are belong to us.: {}\n", .{f});
+  if (ret == 0) {
+    std.debug.warn("FAILED writing to file: {}\n", .{image_filename});
+  } else {
+    std.debug.warn("Successfuly written file: {}\n", .{image_filename});
+  }
 }
 
 //------------------------------------------------------------------------------
