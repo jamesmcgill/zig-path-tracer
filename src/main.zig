@@ -8,12 +8,20 @@ const Vec3 = @import("Vec3.zig").Vec3;
 const Ray = @import("Ray.zig").Ray;
 
 //------------------------------------------------------------------------------
+const Vec2 = struct
+{
+  x: f32,
+  y: f32,
+};
+
+//------------------------------------------------------------------------------
 // Return a random number in the range [0, 1)
 //------------------------------------------------------------------------------
 const MyRand = struct
 {
   rng: std.rand.DefaultPrng,
 
+  //----------------------------------------------------------------------------
   pub fn create() MyRand
   {
     var buf: [8]u8 = undefined;
@@ -28,10 +36,13 @@ const MyRand = struct
     };
   }
 
+  //----------------------------------------------------------------------------
   pub fn float(self: *MyRand) f32
   {
     return self.rng.random.float(f32);
   }
+
+  //----------------------------------------------------------------------------
 };
 
 //------------------------------------------------------------------------------
@@ -43,6 +54,80 @@ const Color = packed struct
   alpha: u8,
 
   pub const NUM_COMPONENTS: u32 = 4;
+};
+
+//------------------------------------------------------------------------------
+const Camera = struct
+{
+  position: Vec3,
+  scale: Vec2,
+  offset: Vec2,
+  frustum_dist: f32,
+
+  const default_frustum_width: f32 = 200.0;
+  const default_frustum_height: f32 = 200.0;
+  const default_frustum_dist: f32 = 100.0;
+
+  //----------------------------------------------------------------------------
+  // Scale image (screen) to world space
+  //----------------------------------------------------------------------------
+  pub fn calcScale(
+    image_width: u32,
+    image_height: u32,
+    frustum_width: f32,
+    frustum_height: f32) Vec2
+  {
+    return Vec2
+    {
+      .x = frustum_width / @intToFloat(f32, image_width - 1),
+      .y = frustum_height / @intToFloat(f32, image_height - 1),
+    };
+  }
+
+  //----------------------------------------------------------------------------
+  // Center image at x=0, y=0
+  //----------------------------------------------------------------------------
+  pub fn calcOffset(frustum_width: f32, frustum_height: f32) Vec2
+  {
+    return Vec2
+    {
+      .x = -frustum_width / 2.0,
+      .y = -frustum_height / 2.0,
+    };
+  }
+
+  //----------------------------------------------------------------------------
+  pub fn create(
+    position: Vec3,
+    image_width: u32,
+    image_height: u32,
+    frustum_width: f32,
+    frustum_height: f32,
+    frustum_dist: f32) Camera
+  {
+    return Camera
+    {
+        .position = position,
+        .scale = calcScale(
+          image_width, image_height, frustum_width, frustum_height),
+        .offset = calcOffset(frustum_width, frustum_height),
+        .frustum_dist = frustum_dist,
+    };
+  }
+
+  //----------------------------------------------------------------------------
+  pub fn calcRay(cam: Camera, col: f32, row: f32, rand: *MyRand) Ray
+  {
+    // The point that corresponds to on the frustum plane
+    const to_x: f32 = cam.offset.x + ((col + rand.float()) * cam.scale.x);
+    const to_y: f32 = cam.offset.y + ((row + rand.float()) * cam.scale.y);
+    const to_pixel = Vec3{.x = to_x, .y = to_y, .z = cam.frustum_dist};
+
+    const ray_dir: Vec3 = to_pixel.subtract(cam.position);
+    return Ray{.origin = cam.position, .direction = ray_dir};
+  }
+
+  //----------------------------------------------------------------------------
 };
 
 //------------------------------------------------------------------------------
@@ -66,6 +151,7 @@ const Sphere = struct
   radius: f32,
   color: Vec3,
 
+  //----------------------------------------------------------------------------
   pub fn hitTest(self: Sphere, ray: Ray, t_min: f32, t_max: f32) ?HitInfo
   {
     const displacement = ray.origin.subtract(self.position);
@@ -96,6 +182,7 @@ const Sphere = struct
     return null;
   }
 
+  //----------------------------------------------------------------------------
   pub fn isInRange(val: f32, min: f32, max: f32) bool
   {
     if (val < min) { return false; }
@@ -103,6 +190,7 @@ const Sphere = struct
     return true;
   }
 
+  //----------------------------------------------------------------------------
   pub fn closestValidT(t1: f32, t2: f32, t_min: f32, t_max: f32) ?f32
   {
     var isT1Valid = isInRange(t1, t_min, t_max);
@@ -114,6 +202,8 @@ const Sphere = struct
 
     return if (t1 < t2) t1 else t2;
   }
+
+  //----------------------------------------------------------------------------
 };
 
 //------------------------------------------------------------------------------
@@ -177,26 +267,19 @@ pub fn main() anyerror!void
     },
   };
 
-  var r = MyRand.create();
+  var rand = MyRand.create();
+
+  const camera_pos = Vec3{.x = 0.0, .y = 0.0, .z = 0.0};
+  const camera = Camera.create(
+    camera_pos,
+    image_width, image_height,
+    Camera.default_frustum_width,
+    Camera.default_frustum_height,
+    Camera.default_frustum_dist
+  );
 
   // Output image
   var pixels: [image_width * image_height]Color = undefined;
-
-  // Frustum extents
-  const frustum_width: f32 = 200.0;
-  const frustum_height: f32 = 200.0;
-  const frustum_dist: f32 = 100.0;
-
-  // Scale image (screen) to world space
-  const x_scale: f32 = frustum_width / @intToFloat(f32, image_width - 1);
-  const y_scale: f32 = frustum_height / @intToFloat(f32, image_height - 1);
-
-  // Center image at x=0, y=0
-  const x_offset: f32 = -frustum_width / 2.0;
-  const y_offset: f32 = -frustum_height / 2.0;
-
-  // Ray casting from origin
-  const ray_origin = Vec3 {.x = 0.0, .y = 0.0, .z = 0.0};
 
   for (pixels) |*item, it|
   {
@@ -210,14 +293,7 @@ pub fn main() anyerror!void
     var samp: u32 = 0;
     while (samp < num_samples) : (samp += 1)
     {
-      // The point that corresponds to on the frustum plane
-      const to_x: f32 = x_offset + ((col + r.float()) * x_scale);
-      const to_y: f32 = y_offset + ((row + r.float()) * y_scale);
-      const to_pixel = Vec3{.x = to_x, .y = to_y, .z = frustum_dist};
-
-      const ray_dir: Vec3 = to_pixel.subtract(ray_origin);
-      const ray = Ray{.origin = ray_origin, .direction = ray_dir};
-
+      const ray = camera.calcRay(col, row, &rand);
       color = color.add( calcColor(ray, scene) );
     }
 
