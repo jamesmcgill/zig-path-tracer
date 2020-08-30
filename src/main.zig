@@ -165,14 +165,14 @@ pub fn main() anyerror!void
     .spheres = &[_]Sphere
     {
       .{
-        .position = Vec3.init(-30.0, 0.0, 110.0),
+        .position = Vec3.init(-30.0, 0.0, 110.0), // WHY do I need init() here?
         .radius = 20.0,
-        .color = Vec3.init(1.0, 0.0, 0.0),
+        .color = Vec3{.x = 1.0, .y = 0.0, .z = 0.0},
       },
       .{
-        .position = Vec3.init(30.0, 0.0, 110.0),
+        .position = Vec3{.x =30.0, .y = 0.0, .z = 110.0},
         .radius = 20.0,
-        .color = Vec3.init(1.0, 0.0, 0.0),
+        .color = Vec3{.x = 1.0, .y = 0.0, .z = 0.0},
       },
     },
   };
@@ -213,10 +213,10 @@ pub fn main() anyerror!void
       // The point that corresponds to on the frustum plane
       const to_x: f32 = x_offset + ((col + r.float()) * x_scale);
       const to_y: f32 = y_offset + ((row + r.float()) * y_scale);
-      const to_pixel: Vec3 = Vec3.init(to_x, to_y, frustum_dist);
+      const to_pixel = Vec3{.x = to_x, .y = to_y, .z = frustum_dist};
 
       const ray_dir: Vec3 = to_pixel.subtract(ray_origin);
-      const ray = Ray.init(ray_origin, ray_dir);
+      const ray = Ray{.origin = ray_origin, .direction = ray_dir};
 
       color = color.add( calcColor(ray, scene) );
     }
