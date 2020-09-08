@@ -43,6 +43,20 @@ const MyRand = struct
   }
 
   //----------------------------------------------------------------------------
+  pub fn randomPointFromUnitSphere(self: *MyRand) Vec3
+  {
+    return while (true)
+    {
+      const p = Vec3 {
+        .x = (self.float() * 2.0) - 1.0,
+        .y = (self.float() * 2.0) - 1.0,
+        .z = (self.float() * 2.0) - 1.0,
+      };
+      if (p.lengthSq() < 1.0) { break p; }
+    } else p;
+  }
+  //----------------------------------------------------------------------------
+
 };
 
 //------------------------------------------------------------------------------
@@ -207,12 +221,14 @@ const Sphere = struct
 };
 
 //------------------------------------------------------------------------------
-pub fn calcColor(ray: Ray, scene: Scene) Vec3
+pub fn calcColor(ray: Ray, scene: Scene, rand: *MyRand, call_depth: u32) Vec3
 {
+  if (call_depth > 5) { return Vec3{.x = 0.0, .y = 1.0, .z = 1.0}; }
+
   // Test all objects in the scene
   var hit_something: bool = false;
   var closest_t: f32 = 100000.0;
-  var closest_hit: HitInfo = undefined;
+  var hit: HitInfo = undefined;
 
   for (scene.spheres) |sphere|
   {
@@ -220,12 +236,24 @@ pub fn calcColor(ray: Ray, scene: Scene) Vec3
     {
       hit_something = true;
       closest_t = info.t;
-      closest_hit = info;
+      hit = info;
     }
   }
   if (hit_something)
   {
-    return closest_hit.surface_normal.normalized().rescaled();
+    const normal_sphere_pos =  hit.point.add(hit.surface_normal.normalized());
+    const reflect_point =
+      normal_sphere_pos.add(rand.randomPointFromUnitSphere());
+
+      return calcColor(
+        Ray {
+          .origin = hit.point,
+          .direction = reflect_point.subtract(hit.point),
+        },
+        scene,
+        rand,
+        call_depth + 1
+      ).scale(0.5);
   }
 
   // Draw background
@@ -242,8 +270,8 @@ pub fn main() anyerror!void
 {
   // Output image details
   const image_filename = "test.bmp";
-  const image_width: u32 = 256;
-  const image_height: u32 = 256;
+  const image_width: u32 = 1024;
+  const image_height: u32 = 1024;
 
   // Rendering parameters
   const num_samples: u32 = 100;
@@ -255,13 +283,13 @@ pub fn main() anyerror!void
     .spheres = &[_]Sphere
     {
       .{
-        .position = Vec3.init(-30.0, 0.0, 110.0), // WHY do I need init() here?
+        .position = Vec3.init(0.0, 0.0, 110.0), // WHY do I need init() here?
         .radius = 20.0,
         .color = Vec3{.x = 1.0, .y = 0.0, .z = 0.0},
       },
       .{
-        .position = Vec3{.x =30.0, .y = 0.0, .z = 110.0},
-        .radius = 20.0,
+        .position = Vec3{.x = 0.0, .y = -320.0, .z = 110.0},
+        .radius = 300.0,
         .color = Vec3{.x = 1.0, .y = 0.0, .z = 0.0},
       },
     },
@@ -294,7 +322,7 @@ pub fn main() anyerror!void
     while (samp < num_samples) : (samp += 1)
     {
       const ray = camera.calcRay(col, row, &rand);
-      color = color.add( calcColor(ray, scene) );
+      color = color.add( calcColor(ray, scene, &rand, 0) );
     }
 
     color = color.scale(num_samples_recip);
