@@ -77,6 +77,7 @@ pub const Vec3 = struct {
     //--------------------------------------------------------------------------
     // Scale a normalized vector in range [-1, 1] to range [0, 1]
     //--------------------------------------------------------------------------
+    // TODO: find a better name (requires a normal vector) eg positiveScaleNormal
     pub fn rescaled(self: Vec3) Vec3 {
         return self.addScalar(1.0).scale(0.5);
     }
@@ -84,6 +85,15 @@ pub const Vec3 = struct {
     //--------------------------------------------------------------------------
     pub fn dot(self: Vec3, other: Vec3) f32 {
         return self.x * other.x + self.y * other.y + self.z * other.z;
+    }
+
+    //--------------------------------------------------------------------------
+    pub fn sqrt(self: Vec3) Vec3 {
+        return Vec3{
+            .x = math.sqrt(self.x),
+            .y = math.sqrt(self.y),
+            .z = math.sqrt(self.z),
+        };
     }
 
     //--------------------------------------------------------------------------

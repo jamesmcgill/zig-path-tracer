@@ -227,7 +227,7 @@ pub fn calcColor(ray: Ray, scene: Scene, rand: *MyRand, call_depth: u32) Vec3
 
   // Test all objects in the scene
   var hit_something: bool = false;
-  var closest_t: f32 = 100000.0;
+  var closest_t: f32 = math.f32_max;
   var hit: HitInfo = undefined;
 
   for (scene.spheres) |sphere|
@@ -325,7 +325,8 @@ pub fn main() anyerror!void
       color = color.add( calcColor(ray, scene, &rand, 0) );
     }
 
-    color = color.scale(num_samples_recip);
+    color = color.scale(num_samples_recip);   // Average of samples
+    color = color.sqrt();                     // Gamma correction
     item.red = @floatToInt(u8, color.x * 255.0);
     item.green = @floatToInt(u8, color.y * 255.0);
     item.blue = @floatToInt(u8, color.z * 255.0);
