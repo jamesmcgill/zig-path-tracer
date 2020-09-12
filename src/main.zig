@@ -232,7 +232,7 @@ pub fn calcColor(ray: Ray, scene: Scene, rand: *MyRand, call_depth: u32) Vec3
 
   for (scene.spheres) |sphere|
   {
-    if (sphere.hitTest(ray, 0.0, closest_t)) |info|
+    if (sphere.hitTest(ray, 0.001, closest_t)) |info|
     {
       hit_something = true;
       closest_t = info.t;
