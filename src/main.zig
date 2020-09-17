@@ -150,6 +150,7 @@ const HitInfo = struct
   point: Vec3,
   t: f32,
   surface_normal: Vec3,
+  material_ptr: *const Material,
 };
 
 //------------------------------------------------------------------------------
@@ -163,7 +164,7 @@ const Sphere = struct
 {
   position: Vec3,
   radius: f32,
-  color: Vec3,
+  material: Material,
 
   //----------------------------------------------------------------------------
   pub fn hitTest(self: Sphere, ray: Ray, t_min: f32, t_max: f32) ?HitInfo
@@ -191,6 +192,7 @@ const Sphere = struct
         .point = point_at_t,
         .t = t,
         .surface_normal = point_at_t.subtract(self.position),
+        .material_ptr = &self.material,
       };
     }
     return null;
@@ -221,6 +223,81 @@ const Sphere = struct
 };
 
 //------------------------------------------------------------------------------
+const MaterialTag = enum
+{
+  Lambertian,
+  Metal,
+};
+
+const Material = union(MaterialTag)
+{
+  Lambertian: LambertianMaterial,
+  Metal: MetalMaterial,
+};
+
+//------------------------------------------------------------------------------
+const ScatterInfo = struct
+{
+  ray: Ray,
+  attenuation: Vec3,
+};
+
+//------------------------------------------------------------------------------
+const LambertianMaterial = struct
+{
+  albedo: Vec3,
+
+  pub fn scatter(
+    self: LambertianMaterial,
+    ray: Ray,
+    hit: HitInfo,
+    rand: *MyRand,
+  ) ?ScatterInfo
+  {
+    const normal_sphere_pos =  hit.point.add(hit.surface_normal.normalized());
+    const reflect_point =
+      normal_sphere_pos.add(rand.randomPointFromUnitSphere());
+
+    return ScatterInfo
+    {
+      .ray = Ray
+      {
+        .origin = hit.point,
+        .direction = reflect_point.subtract(hit.point),
+      },
+      .attenuation = self.albedo,
+    };
+
+  }
+};
+
+//------------------------------------------------------------------------------
+const MetalMaterial = struct
+{
+  albedo: Vec3,
+
+  pub fn scatter(
+    self: MetalMaterial,
+    ray: Ray,
+    hit: HitInfo,
+    rand: *MyRand,
+  ) ?ScatterInfo
+  {
+    const reflected_dir = ray.direction.reflect(hit.surface_normal);
+    if (reflected_dir.dot(hit.surface_normal) > 0.0)
+    {
+      return ScatterInfo
+      {
+        .ray = Ray{.origin = hit.point, .direction = reflected_dir},
+        .attenuation = self.albedo,
+      };
+    }
+
+    return null;
+  }
+};
+
+//------------------------------------------------------------------------------
 pub fn calcColor(ray: Ray, scene: Scene, rand: *MyRand, call_depth: u32) Vec3
 {
   if (call_depth > 5) { return Vec3{.x = 0.0, .y = 1.0, .z = 1.0}; }
@@ -230,30 +307,32 @@ pub fn calcColor(ray: Ray, scene: Scene, rand: *MyRand, call_depth: u32) Vec3
   var closest_t: f32 = math.f32_max;
   var hit: HitInfo = undefined;
 
-  for (scene.spheres) |sphere|
+  for (scene.spheres) |*sphere_ptr|
   {
-    if (sphere.hitTest(ray, 0.001, closest_t)) |info|
+    if (sphere_ptr.hitTest(ray, 0.001, closest_t)) |info|
     {
       hit_something = true;
       closest_t = info.t;
       hit = info;
     }
   }
+
   if (hit_something)
   {
-    const normal_sphere_pos =  hit.point.add(hit.surface_normal.normalized());
-    const reflect_point =
-      normal_sphere_pos.add(rand.randomPointFromUnitSphere());
+    const scatter_info = switch(hit.material_ptr.*)
+    {
+      MaterialTag.Lambertian => |mat| mat.scatter(ray, hit, rand),
+      MaterialTag.Metal =>      |mat| mat.scatter(ray, hit, rand),
+    };
 
+    if (scatter_info) |scatter| {
       return calcColor(
-        Ray {
-          .origin = hit.point,
-          .direction = reflect_point.subtract(hit.point),
-        },
+        scatter.ray,
         scene,
         rand,
         call_depth + 1
-      ).scale(0.5);
+      ).multiply(scatter.attenuation);
+    }
   }
 
   // Draw background
@@ -283,14 +362,37 @@ pub fn main() anyerror!void
     .spheres = &[_]Sphere
     {
       .{
-        .position = Vec3.init(0.0, 0.0, 110.0), // WHY do I need init() here?
-        .radius = 20.0,
-        .color = Vec3{.x = 1.0, .y = 0.0, .z = 0.0},
+        .position = Vec3.init(0.0, -320.0, 110.0), // WHY do I need init() here?
+        .radius = 300.0,
+        .material = Material
+        {
+          .Lambertian = LambertianMaterial
+          {
+            .albedo = Vec3{.x = 0.8, .y = 0.8, .z = 0.0}
+          }
+        }
       },
       .{
-        .position = Vec3{.x = 0.0, .y = -320.0, .z = 110.0},
-        .radius = 300.0,
-        .color = Vec3{.x = 1.0, .y = 0.0, .z = 0.0},
+        .position = Vec3{.x = 21.0, .y = 0.0, .z = 110.0},
+        .radius = 20.0,
+        .material = Material
+        {
+          .Lambertian = LambertianMaterial
+          {
+            .albedo = Vec3{.x = 0.8, .y = 0.3, .z = 0.3}
+          }
+        }
+      },
+      .{
+        .position = Vec3{.x = -21.0, .y = 0.0, .z = 110.0},
+        .radius = 20.0,
+        .material = Material
+        {
+          .Metal = MetalMaterial
+          {
+            .albedo = Vec3{.x = 0.8, .y = 0.6, .z = 0.2}
+          }
+        }
       },
     },
   };

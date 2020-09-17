@@ -33,6 +33,15 @@ pub const Vec3 = struct {
     }
 
     //--------------------------------------------------------------------------
+    pub fn multiply(self: Vec3, other: Vec3) Vec3 {
+        return Vec3{
+            .x = self.x * other.x,
+            .y = self.y * other.y,
+            .z = self.z * other.z,
+        };
+    }
+
+    //--------------------------------------------------------------------------
     pub fn addScalar(self: Vec3, val: f32) Vec3 {
         return Vec3{
             .x = self.x + val,
@@ -94,6 +103,12 @@ pub const Vec3 = struct {
             .y = math.sqrt(self.y),
             .z = math.sqrt(self.z),
         };
+    }
+
+    //--------------------------------------------------------------------------
+    pub fn reflect(self: Vec3, surface_normal: Vec3) Vec3 {
+        const proj = self.dot(surface_normal);
+        return self.subtract(surface_normal.scale(proj).scale(2.0));
     }
 
     //--------------------------------------------------------------------------
