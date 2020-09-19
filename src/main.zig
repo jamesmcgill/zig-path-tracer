@@ -3,6 +3,7 @@ const c_import = @cImport({
 });
 const std = @import("std");
 const math = @import("std").math;
+const time = @import("std").time;
 
 const Vec3 = @import("Vec3.zig").Vec3;
 const Ray = @import("Ray.zig").Ray;
@@ -411,6 +412,7 @@ pub fn main() anyerror!void
   // Output image
   var pixels: [image_width * image_height]Color = undefined;
 
+  var timer = try time.Timer.start();
   for (pixels) |*item, it|
   {
     const pix = @intCast(u32, it);
@@ -434,6 +436,7 @@ pub fn main() anyerror!void
     item.blue = @floatToInt(u8, color.z * 255.0);
     item.alpha = 0xFF;
   }
+  std.debug.warn("Render Time: {d:.3}s\n", .{@intToFloat(f32, timer.read()) / time.ns_per_s});
 
   // Save the image to a file
   var ret = c_import.stbi_write_bmp(
