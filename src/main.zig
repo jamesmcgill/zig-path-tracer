@@ -157,7 +157,39 @@ const HitInfo = struct
 //------------------------------------------------------------------------------
 const Scene = struct
 {
-  spheres: []Sphere,
+  spheres: []const Sphere,
+};
+
+//------------------------------------------------------------------------------
+const basic_scene = Scene
+{
+  .spheres = &[_]Sphere
+  {
+    .{
+      .position = .{.x = 0.0, .y = -320.0, .z = 110.0},
+      .radius = 300.0,
+      .material =
+      .{
+        .Lambertian = .{.albedo = .{.x = 0.8, .y = 0.8, .z = 0.0}}
+      }
+    },
+    .{
+      .position = .{.x = 21.0, .y = 0.0, .z = 110.0},
+      .radius = 20.0,
+      .material =
+      .{
+        .Lambertian = .{.albedo = .{.x = 0.8, .y = 0.3, .z = 0.3}}
+      }
+    },
+    .{
+      .position = .{.x = -21.0, .y = 0.0, .z = 110.0},
+      .radius = 20.0,
+      .material =
+      .{
+        .Metal = .{.albedo = .{.x = 0.8, .y = 0.6, .z = 0.2}}
+      }
+    },
+  },
 };
 
 //------------------------------------------------------------------------------
@@ -299,7 +331,7 @@ const MetalMaterial = struct
 };
 
 //------------------------------------------------------------------------------
-pub fn calcColor(ray: Ray, scene: Scene, rand: *MyRand, call_depth: u32) Vec3
+pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) Vec3
 {
   if (call_depth > 5) { return Vec3{.x = 0.0, .y = 1.0, .z = 1.0}; }
 
@@ -348,55 +380,17 @@ pub fn calcColor(ray: Ray, scene: Scene, rand: *MyRand, call_depth: u32) Vec3
 //------------------------------------------------------------------------------
 pub fn main() anyerror!void
 {
+  // Scene to draw
+  const scene_ptr = &basic_scene;
+
   // Output image details
   const image_filename = "test.bmp";
-  const image_width: u32 = 1024;
-  const image_height: u32 = 1024;
+  const image_width: u32 = 256;
+  const image_height: u32 = 256;
 
   // Rendering parameters
   const num_samples: u32 = 100;
   const num_samples_recip: f32 = 1.0 / @intToFloat(f32, num_samples);
-
-  // Scene objects
-  const scene = Scene
-  {
-    .spheres = &[_]Sphere
-    {
-      .{
-        .position = Vec3.init(0.0, -320.0, 110.0), // WHY do I need init() here?
-        .radius = 300.0,
-        .material = Material
-        {
-          .Lambertian = LambertianMaterial
-          {
-            .albedo = Vec3{.x = 0.8, .y = 0.8, .z = 0.0}
-          }
-        }
-      },
-      .{
-        .position = Vec3{.x = 21.0, .y = 0.0, .z = 110.0},
-        .radius = 20.0,
-        .material = Material
-        {
-          .Lambertian = LambertianMaterial
-          {
-            .albedo = Vec3{.x = 0.8, .y = 0.3, .z = 0.3}
-          }
-        }
-      },
-      .{
-        .position = Vec3{.x = -21.0, .y = 0.0, .z = 110.0},
-        .radius = 20.0,
-        .material = Material
-        {
-          .Metal = MetalMaterial
-          {
-            .albedo = Vec3{.x = 0.8, .y = 0.6, .z = 0.2}
-          }
-        }
-      },
-    },
-  };
 
   var rand = MyRand.create();
 
@@ -426,7 +420,7 @@ pub fn main() anyerror!void
     while (samp < num_samples) : (samp += 1)
     {
       const ray = camera.calcRay(col, row, &rand);
-      color = color.add( calcColor(ray, scene, &rand, 0) );
+      color = color.add( calcColor(ray, scene_ptr, &rand, 0) );
     }
 
     color = color.scale(num_samples_recip);   // Average of samples
