@@ -79,9 +79,9 @@ const Camera = struct
   offset: Vec2,
   frustum_dist: f32,
 
-  const default_frustum_width: f32 = 200.0;
-  const default_frustum_height: f32 = 200.0;
-  const default_frustum_dist: f32 = 100.0;
+  const default_frustum_width: f32 = 4.0;
+  const default_frustum_height: f32 = 2.0;
+  const default_frustum_dist: f32 = 1.0;
 
   //----------------------------------------------------------------------------
   // Scale image (screen) to world space
@@ -107,7 +107,7 @@ const Camera = struct
     return Vec2
     {
       .x = -frustum_width / 2.0,
-      .y = -frustum_height / 2.0,
+      .y = frustum_height / 2.0,
     };
   }
 
@@ -122,11 +122,11 @@ const Camera = struct
   {
     return Camera
     {
-        .position = position,
-        .scale = calcScale(
-          image_width, image_height, frustum_width, frustum_height),
-        .offset = calcOffset(frustum_width, frustum_height),
-        .frustum_dist = frustum_dist,
+      .position = position,
+      .scale = calcScale(
+        image_width, image_height, frustum_width, frustum_height),
+      .offset = calcOffset(frustum_width, frustum_height),
+      .frustum_dist = frustum_dist,
     };
   }
 
@@ -135,14 +135,12 @@ const Camera = struct
   {
     // The point that corresponds to on the frustum plane
     const to_x: f32 = cam.offset.x + ((col + rand.float()) * cam.scale.x);
-    const to_y: f32 = cam.offset.y + ((row + rand.float()) * cam.scale.y);
-    const to_pixel = Vec3{.x = to_x, .y = to_y, .z = cam.frustum_dist};
+    const to_y: f32 = cam.offset.y - ((row + rand.float()) * cam.scale.y);
+    const to_pixel = Vec3{.x = to_x, .y = to_y, .z = -cam.frustum_dist};
 
     const ray_dir: Vec3 = to_pixel.subtract(cam.position);
     return Ray{.origin = cam.position, .direction = ray_dir};
   }
-
-  //----------------------------------------------------------------------------
 };
 
 //------------------------------------------------------------------------------
@@ -166,27 +164,35 @@ const basic_scene = Scene
   .spheres = &[_]Sphere
   {
     .{
-      .position = .{.x = 0.0, .y = -320.0, .z = 110.0},
-      .radius = 300.0,
+      .position = .{.x = 0.0, .y = -100.5, .z = -1.0},
+      .radius = 100.0,
       .material =
       .{
         .Lambertian = .{.albedo = .{.x = 0.8, .y = 0.8, .z = 0.0}}
       }
     },
     .{
-      .position = .{.x = 21.0, .y = 0.0, .z = 110.0},
-      .radius = 20.0,
+      .position = .{.x = 0.0, .y = 0.0, .z = -1.0},
+      .radius = 0.5,
       .material =
       .{
         .Lambertian = .{.albedo = .{.x = 0.8, .y = 0.3, .z = 0.3}}
       }
     },
     .{
-      .position = .{.x = -21.0, .y = 0.0, .z = 110.0},
-      .radius = 20.0,
+      .position = .{.x = 1.0, .y = 0.0, .z = -1.0},
+      .radius = 0.5,
       .material =
       .{
         .Metal = .{.albedo = .{.x = 0.8, .y = 0.6, .z = 0.2}}
+      }
+    },
+    .{
+      .position = .{.x = -1.0, .y = 0.0, .z = -1.0},
+      .radius = 0.5,
+      .material =
+      .{
+        .Metal = .{.albedo = .{.x = 0.8, .y = 0.8, .z = 0.8}}
       }
     },
   },
@@ -224,7 +230,7 @@ const Sphere = struct
       {
         .point = point_at_t,
         .t = t,
-        .surface_normal = point_at_t.subtract(self.position),
+        .surface_normal = point_at_t.subtract(self.position).normalized(),
         .material_ptr = &self.material,
       };
     }
@@ -287,7 +293,7 @@ const LambertianMaterial = struct
     rand: *MyRand,
   ) ?ScatterInfo
   {
-    const normal_sphere_pos =  hit.point.add(hit.surface_normal.normalized());
+    const normal_sphere_pos =  hit.point.add(hit.surface_normal);
     const reflect_point =
       normal_sphere_pos.add(rand.randomPointFromUnitSphere());
 
@@ -372,8 +378,8 @@ pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) 
   const unit_direction = ray.direction.normalized();
   const t: f32 = (unit_direction.y + 1.0) * 0.5;
 
-  const white_tone = Vec3.init(1.0, 1.0, 1.0).scale(t);
-  const blue_tone = Vec3.init(0.5, 0.7, 1.0).scale(1.0 - t);
+  const white_tone = Vec3.init(1.0, 1.0, 1.0).scale(1.0 - t);
+  const blue_tone = Vec3.init(0.5, 0.7, 1.0).scale(t);
   return white_tone.add(blue_tone);
 }
 
@@ -385,8 +391,8 @@ pub fn main() anyerror!void
 
   // Output image details
   const image_filename = "test.bmp";
-  const image_width: u32 = 256;
-  const image_height: u32 = 256;
+  const image_width: u32 = 1024 * 2;
+  const image_height: u32 = 1024;
 
   // Rendering parameters
   const num_samples: u32 = 100;
@@ -406,6 +412,7 @@ pub fn main() anyerror!void
   // Output image
   var pixels: [image_width * image_height]Color = undefined;
 
+  std.debug.warn("Reticulating splines...\n", .{});
   var timer = try time.Timer.start();
   for (pixels) |*item, it|
   {
