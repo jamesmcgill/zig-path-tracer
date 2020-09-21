@@ -112,4 +112,18 @@ pub const Vec3 = struct {
     }
 
     //--------------------------------------------------------------------------
+    pub fn refract(self: Vec3, surface_normal: Vec3, ni_over_nt: f32) Vec3 {
+        const unit_v = self.normalized().scale(-1.0);
+        const cos_theta = unit_v.dot(surface_normal);
+
+        const proj_n = surface_normal.scale(cos_theta);
+        const r_out_perp = unit_v.add(proj_n).scale(ni_over_nt);
+
+        const parallel_len = -math.sqrt(math.fabs(1.0 - r_out_perp.lengthSq()));
+        const r_out_parallel = surface_normal.scale(parallel_len);
+
+        return r_out_perp.add(r_out_parallel);
+    }
+
+    //--------------------------------------------------------------------------
 };

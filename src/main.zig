@@ -149,6 +149,7 @@ const HitInfo = struct
   point: Vec3,
   t: f32,
   surface_normal: Vec3,
+  front_face: bool,
   material_ptr: *const Material,
 };
 
@@ -192,7 +193,7 @@ const basic_scene = Scene
       .radius = 0.5,
       .material =
       .{
-        .Metal = .{.albedo = .{.x = 0.8, .y = 0.8, .z = 0.8}, .fuzz = 0.3}
+        .Dielectric = .{.refract_index = 1.5}
       }
     },
   },
@@ -226,11 +227,13 @@ const Sphere = struct
     if (closestValidT(t1, t2, t_min, t_max)) |t|
     {
       const point_at_t = ray.pointAtT(t);
+      const outward_normal = point_at_t.subtract(self.position).normalized();
       return HitInfo
       {
         .point = point_at_t,
         .t = t,
-        .surface_normal = point_at_t.subtract(self.position).normalized(),
+        .surface_normal = outward_normal,
+        .front_face = (outward_normal.dot(ray.direction) < 0.0),
         .material_ptr = &self.material,
       };
     }
@@ -266,12 +269,14 @@ const MaterialTag = enum
 {
   Lambertian,
   Metal,
+  Dielectric,
 };
 
 const Material = union(MaterialTag)
 {
   Lambertian: LambertianMaterial,
   Metal: MetalMaterial,
+  Dielectric: DielectricMaterial,
 };
 
 //------------------------------------------------------------------------------
@@ -340,6 +345,35 @@ const MetalMaterial = struct
 };
 
 //------------------------------------------------------------------------------
+const DielectricMaterial = struct
+{
+  refract_index: f32,
+
+  pub fn scatter(
+    self: DielectricMaterial,
+    ray: Ray,
+    hit: HitInfo,
+    rand: *MyRand,
+  ) ?ScatterInfo
+  {
+    const ni_over_nt: f32 = if (hit.front_face) 1.0 / self.refract_index
+      else self.refract_index;
+
+    const surface_normal = if (hit.front_face) hit.surface_normal
+     else hit.surface_normal.scale(-1.0);
+
+    const unit_dir = ray.direction.normalized();
+    const refracted_dir = unit_dir.refract(surface_normal, ni_over_nt);
+
+    return ScatterInfo
+    {
+      .ray = Ray{.origin = hit.point, .direction = refracted_dir},
+      .attenuation = Vec3{.x = 1.0, .y = 1.0, .z = 1.0},
+    };
+  }
+};
+
+//------------------------------------------------------------------------------
 pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) Vec3
 {
   if (call_depth > 5) { return Vec3{.x = 0.0, .y = 0.0, .z = 0.0}; }
@@ -365,6 +399,7 @@ pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) 
     {
       MaterialTag.Lambertian => |mat| mat.scatter(ray, hit, rand),
       MaterialTag.Metal =>      |mat| mat.scatter(ray, hit, rand),
+      MaterialTag.Dielectric => |mat| mat.scatter(ray, hit, rand),
     };
 
     if (scatter_info) |scatter| {
