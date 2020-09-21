@@ -342,7 +342,7 @@ const MetalMaterial = struct
 //------------------------------------------------------------------------------
 pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) Vec3
 {
-  if (call_depth > 5) { return Vec3{.x = 0.0, .y = 1.0, .z = 1.0}; }
+  if (call_depth > 5) { return Vec3{.x = 0.0, .y = 0.0, .z = 0.0}; }
 
   // Test all objects in the scene
   var hit_something: bool = false;
@@ -374,6 +374,10 @@ pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) 
         rand,
         call_depth + 1
       ).multiply(scatter.attenuation);
+    }
+    else
+    {
+      return Vec3{.x = 0.0, .y = 0.0, .z = 0.0};
     }
   }
 
