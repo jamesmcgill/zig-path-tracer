@@ -184,7 +184,7 @@ const basic_scene = Scene
       .radius = 0.5,
       .material =
       .{
-        .Metal = .{.albedo = .{.x = 0.8, .y = 0.6, .z = 0.2}}
+        .Metal = .{.albedo = .{.x = 0.8, .y = 0.6, .z = 0.2}, .fuzz = 1.0}
       }
     },
     .{
@@ -192,7 +192,7 @@ const basic_scene = Scene
       .radius = 0.5,
       .material =
       .{
-        .Metal = .{.albedo = .{.x = 0.8, .y = 0.8, .z = 0.8}}
+        .Metal = .{.albedo = .{.x = 0.8, .y = 0.8, .z = 0.8}, .fuzz = 0.3}
       }
     },
   },
@@ -314,6 +314,7 @@ const LambertianMaterial = struct
 const MetalMaterial = struct
 {
   albedo: Vec3,
+  fuzz: f32,
 
   pub fn scatter(
     self: MetalMaterial,
@@ -323,11 +324,13 @@ const MetalMaterial = struct
   ) ?ScatterInfo
   {
     const reflected_dir = ray.direction.reflect(hit.surface_normal);
-    if (reflected_dir.dot(hit.surface_normal) > 0.0)
+    const fuzz_offset = rand.randomPointFromUnitSphere().scale(self.fuzz);
+    const scattered_dir = reflected_dir.add(fuzz_offset);
+    if (scattered_dir.dot(hit.surface_normal) > 0.0)
     {
       return ScatterInfo
       {
-        .ray = Ray{.origin = hit.point, .direction = reflected_dir},
+        .ray = Ray{.origin = hit.point, .direction = scattered_dir},
         .attenuation = self.albedo,
       };
     }
