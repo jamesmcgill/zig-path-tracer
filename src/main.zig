@@ -211,23 +211,23 @@ const Sphere = struct
   {
     const displacement = ray.origin.subtract(self.position);
 
-    const a: f32 = Vec3.dot(ray.direction, ray.direction);
-    const b: f32 = 2.0 * Vec3.dot(displacement, ray.direction);
-    const c: f32 = Vec3.dot(displacement, displacement) -
-      (self.radius * self.radius);
+    const a: f32 = ray.direction.lengthSq();
+    const half_b: f32 = Vec3.dot(displacement, ray.direction);
+    const c: f32 = displacement.lengthSq() - (self.radius * self.radius);
 
-    const discriminant: f32 = (b * b) - (4.0 * a * c);
+    const discriminant: f32 = (half_b * half_b) - (a * c);
     if (discriminant < 0.0) { return null; }
 
     const discrim_root = math.sqrt(discriminant);
-    const double_a = 2.0 * a;
-    const t1 = (-b + discrim_root) / double_a;
-    const t2 = (-b - discrim_root) / double_a;
+    const t1 = (-half_b + discrim_root) / a;
+    const t2 = (-half_b - discrim_root) / a;
 
     if (closestValidT(t1, t2, t_min, t_max)) |t|
     {
       const point_at_t = ray.pointAtT(t);
-      const outward_normal = point_at_t.subtract(self.position).normalized();
+      const outward_normal = point_at_t.subtract(self.position)
+        .divideScalar(self.radius);
+
       return HitInfo
       {
         .point = point_at_t,

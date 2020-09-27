@@ -42,6 +42,15 @@ pub const Vec3 = struct {
     }
 
     //--------------------------------------------------------------------------
+    pub fn divide(self: Vec3, other: Vec3) Vec3 {
+        return Vec3{
+            .x = self.x / other.x,
+            .y = self.y / other.y,
+            .z = self.z / other.z,
+        };
+    }
+
+    //--------------------------------------------------------------------------
     pub fn addScalar(self: Vec3, val: f32) Vec3 {
         return Vec3{
             .x = self.x + val,
@@ -65,6 +74,15 @@ pub const Vec3 = struct {
             .x = self.x * scalar,
             .y = self.y * scalar,
             .z = self.z * scalar,
+        };
+    }
+
+    //--------------------------------------------------------------------------
+    pub fn divideScalar(self: Vec3, scalar: f32) Vec3 {
+        return Vec3{
+            .x = self.x / scalar,
+            .y = self.y / scalar,
+            .z = self.z / scalar,
         };
     }
 
