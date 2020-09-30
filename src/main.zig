@@ -219,8 +219,8 @@ const Sphere = struct
     if (discriminant < 0.0) { return null; }
 
     const discrim_root = math.sqrt(discriminant);
-    const t1 = (-half_b + discrim_root) / a;
-    const t2 = (-half_b - discrim_root) / a;
+    const t1 = (-half_b - discrim_root) / a;
+    const t2 = (-half_b + discrim_root) / a;
 
     if (closestValidT(t1, t2, t_min, t_max)) |t|
     {
@@ -356,18 +356,30 @@ const DielectricMaterial = struct
     rand: *MyRand,
   ) ?ScatterInfo
   {
-    const ni_over_nt: f32 = if (hit.front_face) 1.0 / self.refract_index
-      else self.refract_index;
+    // Adjust properties depending on whether ray is entering or exiting surface
+    const ni_over_nt: f32 = if (hit.front_face)
+      1.0 / self.refract_index
+    else
+      self.refract_index;
 
-    const surface_normal = if (hit.front_face) hit.surface_normal
-     else hit.surface_normal.scale(-1.0);
+    const surface_normal = if (hit.front_face)
+      hit.surface_normal
+    else
+      hit.surface_normal.scale(-1.0);
 
-    const unit_dir = ray.direction.normalized();
-    const refracted_dir = unit_dir.refract(surface_normal, ni_over_nt);
+    // Obtain sin theta to check for total internal reflection
+    const unit_v = ray.direction.normalized();
+    const cos_theta = math.min(unit_v.scale(-1.0).dot(surface_normal), 1.0);
+    const sin_theta = math.sqrt(1.0 - cos_theta*cos_theta);
+
+    const scattered_dir: Vec3 = if (ni_over_nt * sin_theta > 1.0)
+      unit_v.reflect(surface_normal)
+    else
+      unit_v.refract(surface_normal, ni_over_nt);
 
     return ScatterInfo
     {
-      .ray = Ray{.origin = hit.point, .direction = refracted_dir},
+      .ray = Ray{.origin = hit.point, .direction = scattered_dir},
       .attenuation = Vec3{.x = 1.0, .y = 1.0, .z = 1.0},
     };
   }
@@ -402,7 +414,8 @@ pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) 
       MaterialTag.Dielectric => |mat| mat.scatter(ray, hit, rand),
     };
 
-    if (scatter_info) |scatter| {
+    if (scatter_info) |scatter|
+    {
       return calcColor(
         scatter.ray,
         scene,
@@ -433,8 +446,8 @@ pub fn main() anyerror!void
 
   // Output image details
   const image_filename = "test.bmp";
-  const image_width: u32 = 1024 * 2;
-  const image_height: u32 = 1024;
+  const image_width: u32 =  2048;
+  const image_height: u32 = image_width / 2;
 
   // Rendering parameters
   const num_samples: u32 = 100;
