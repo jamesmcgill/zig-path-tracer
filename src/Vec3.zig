@@ -1,3 +1,4 @@
+const std = @import("std");
 const math = @import("std").math;
 
 pub const Vec3 = struct {
@@ -125,22 +126,27 @@ pub const Vec3 = struct {
 
     //--------------------------------------------------------------------------
     pub fn reflect(self: Vec3, surface_normal: Vec3) Vec3 {
-        const proj = self.dot(surface_normal);
-        return self.subtract(surface_normal.scale(proj).scale(2.0));
+        const double_height = self.dot(surface_normal) * -2;
+        return self.add(surface_normal.scale(double_height));
     }
 
     //--------------------------------------------------------------------------
     pub fn refract(self: Vec3, surface_normal: Vec3, ni_over_nt: f32) Vec3 {
-        const unit_v = self.normalized().scale(-1.0);
-        const cos_theta = unit_v.dot(surface_normal);
+        const unit_v = self.normalized();
+        const cos_theta = math.min(unit_v.scale(-1.0).dot(surface_normal), 1.0);
 
         const proj_n = surface_normal.scale(cos_theta);
-        const r_out_perp = unit_v.add(proj_n).scale(ni_over_nt);
+        const r_ortho = unit_v.add(proj_n).scale(ni_over_nt);
 
-        const parallel_len = -math.sqrt(math.fabs(1.0 - r_out_perp.lengthSq()));
-        const r_out_parallel = surface_normal.scale(parallel_len);
+        const parallel_len = -math.sqrt(math.fabs(1.0 - r_ortho.lengthSq()));
+        const r_parallel = surface_normal.scale(parallel_len);
 
-        return r_out_perp.add(r_out_parallel);
+        return r_ortho.add(r_parallel);
+    }
+
+    //--------------------------------------------------------------------------
+    pub fn print(self: Vec3) void {
+        std.debug.warn("({d:.3},{d:.3},{d:.3})", .{ self.x, self.y, self.z });
     }
 
     //--------------------------------------------------------------------------
