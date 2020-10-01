@@ -349,6 +349,13 @@ const DielectricMaterial = struct
 {
   refract_index: f32,
 
+  pub fn schlick(cos_theta: f32, refract_index: f32) f32
+  {
+    const r = (1.0 - refract_index) / (1.0 + refract_index);
+    const r0 = r * r;
+    return r0 + (1.0 - r0) * math.pow(f32, (1.0 - cos_theta), 5.0);
+  }
+
   pub fn scatter(
     self: DielectricMaterial,
     ray: Ray,
@@ -372,7 +379,10 @@ const DielectricMaterial = struct
     const cos_theta = math.min(unit_v.scale(-1.0).dot(surface_normal), 1.0);
     const sin_theta = math.sqrt(1.0 - cos_theta*cos_theta);
 
-    const scattered_dir: Vec3 = if (ni_over_nt * sin_theta > 1.0)
+    const will_reflect: bool = ( (ni_over_nt * sin_theta > 1.0)
+      or (schlick(cos_theta, ni_over_nt) > rand.float()) );
+
+    const scattered_dir: Vec3 = if (will_reflect)
       unit_v.reflect(surface_normal)
     else
       unit_v.refractTheta(cos_theta, surface_normal, ni_over_nt);
@@ -388,7 +398,7 @@ const DielectricMaterial = struct
 //------------------------------------------------------------------------------
 pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) Vec3
 {
-  if (call_depth > 5) { return Vec3{.x = 0.0, .y = 0.0, .z = 0.0}; }
+  if (call_depth > 50) { return Vec3{.x = 0.0, .y = 0.0, .z = 0.0}; }
 
   // Test all objects in the scene
   var hit_something: bool = false;
