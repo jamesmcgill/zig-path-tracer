@@ -1,5 +1,6 @@
 const std = @import("std");
 const math = @import("std").math;
+const assert = @import("std").debug.assert;
 
 pub const Vec3 = struct {
     x: f32,
@@ -135,13 +136,19 @@ pub const Vec3 = struct {
         const unit_v = self.normalized();
         const cos_theta = math.min(unit_v.scale(-1.0).dot(surface_normal), 1.0);
 
-        const proj_n = surface_normal.scale(cos_theta);
-        const r_ortho = unit_v.add(proj_n).scale(ni_over_nt);
+        return unit_v.refractTheta(cos_theta, surface_normal, ni_over_nt);
+    }
 
-        const parallel_len = -math.sqrt(math.fabs(1.0 - r_ortho.lengthSq()));
-        const r_parallel = surface_normal.scale(parallel_len);
+    //--------------------------------------------------------------------------
+    pub fn refractTheta(self: Vec3, in_cos_theta: f32, surface_normal: Vec3, ni_over_nt: f32) Vec3 {
+        assert(math.approxEq(f32, 1.0, self.lengthSq(), 0.000001)); // self must be normalized
+        const in_ortho_len = surface_normal.scale(in_cos_theta);
+        const ortho = self.add(in_ortho_len).scale(ni_over_nt);
 
-        return r_ortho.add(r_parallel);
+        const parallel_len = -math.sqrt(math.fabs(1.0 - ortho.lengthSq()));
+        const parallel = surface_normal.scale(parallel_len);
+
+        return ortho.add(parallel);
     }
 
     //--------------------------------------------------------------------------

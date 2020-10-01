@@ -375,7 +375,7 @@ const DielectricMaterial = struct
     const scattered_dir: Vec3 = if (ni_over_nt * sin_theta > 1.0)
       unit_v.reflect(surface_normal)
     else
-      unit_v.refract(surface_normal, ni_over_nt);
+      unit_v.refractTheta(cos_theta, surface_normal, ni_over_nt);
 
     return ScatterInfo
     {
@@ -446,11 +446,11 @@ pub fn main() anyerror!void
 
   // Output image details
   const image_filename = "test.bmp";
-  const image_width: u32 =  2048;
-  const image_height: u32 = image_width / 2;
+  const image_width: u32 =  1920;
+  const image_height: u32 = 1080;
 
   // Rendering parameters
-  const num_samples: u32 = 100;
+  const num_samples: u32 = 200;
   const num_samples_recip: f32 = 1.0 / @intToFloat(f32, num_samples);
 
   var rand = MyRand.create();
