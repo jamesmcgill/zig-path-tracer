@@ -9,6 +9,12 @@ const Vec3 = @import("Vec3.zig").Vec3;
 const Ray = @import("Ray.zig").Ray;
 
 //------------------------------------------------------------------------------
+pub fn degreesToRadians(degrees: f32) f32
+{
+  return (degrees * math.pi) / 180.0;
+}
+
+//------------------------------------------------------------------------------
 const Vec2 = struct
 {
   x: f32,
@@ -79,8 +85,6 @@ const Camera = struct
   offset: Vec2,
   frustum_dist: f32,
 
-  const default_frustum_width: f32 = 4.0;
-  const default_frustum_height: f32 = 2.0;
   const default_frustum_dist: f32 = 1.0;
 
   //----------------------------------------------------------------------------
@@ -116,10 +120,15 @@ const Camera = struct
     position: Vec3,
     image_width: u32,
     image_height: u32,
-    frustum_width: f32,
-    frustum_height: f32,
+    vertical_fov: f32,
+    aspect_ratio: f32,
     frustum_dist: f32) Camera
   {
+    const theta = degreesToRadians(vertical_fov);
+    const h = math.tan(theta / 2.0) * frustum_dist;
+    const frustum_height = 2.0 * h;
+    const frustum_width = aspect_ratio * frustum_height;
+
     return Camera
     {
       .position = position,
@@ -461,7 +470,7 @@ pub fn main() anyerror!void
 
   // Rendering parameters
   const num_samples: u32 = 200;
-  const num_samples_recip: f32 = 1.0 / @intToFloat(f32, num_samples);
+  const num_samples_recip: f32 = 1.0 / @as(f32, num_samples);
 
   var rand = MyRand.create();
 
@@ -469,8 +478,8 @@ pub fn main() anyerror!void
   const camera = Camera.create(
     camera_pos,
     image_width, image_height,
-    Camera.default_frustum_width,
-    Camera.default_frustum_height,
+    90.0,
+    @as(f32, image_width) / @as(f32, image_height),
     Camera.default_frustum_dist
   );
 
