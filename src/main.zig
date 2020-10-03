@@ -185,7 +185,7 @@ const basic_scene = Scene
       .radius = 0.5,
       .material =
       .{
-        .Lambertian = .{.albedo = .{.x = 0.8, .y = 0.3, .z = 0.3}}
+        .Lambertian = .{.albedo = .{.x = 0.1, .y = 0.2, .z = 0.5}}
       }
     },
     .{
@@ -193,12 +193,20 @@ const basic_scene = Scene
       .radius = 0.5,
       .material =
       .{
-        .Metal = .{.albedo = .{.x = 0.8, .y = 0.6, .z = 0.2}, .fuzz = 1.0}
+        .Metal = .{.albedo = .{.x = 0.8, .y = 0.6, .z = 0.2}, .fuzz = 0.0}
       }
     },
     .{
       .position = .{.x = -1.0, .y = 0.0, .z = -1.0},
       .radius = 0.5,
+      .material =
+      .{
+        .Dielectric = .{.refract_index = 1.5}
+      }
+    },
+    .{
+      .position = .{.x = -1.0, .y = 0.0, .z = -1.0},
+      .radius = -0.45,
       .material =
       .{
         .Dielectric = .{.refract_index = 1.5}
