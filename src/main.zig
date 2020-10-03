@@ -81,16 +81,15 @@ const Color = packed struct
 const Camera = struct
 {
   position: Vec3,
-  scale: Vec2,
-  offset: Vec2,
-  frustum_dist: f32,
-
-  const default_frustum_dist: f32 = 1.0;
+  top_left: Vec3,
+  horizontal: Vec3,
+  vertical: Vec3,
+  px_scale: Vec2,
 
   //----------------------------------------------------------------------------
   // Scale image (screen) to world space
   //----------------------------------------------------------------------------
-  pub fn calcScale(
+  pub fn calcPxToViewport(
     image_width: u32,
     image_height: u32,
     frustum_width: f32,
@@ -104,38 +103,38 @@ const Camera = struct
   }
 
   //----------------------------------------------------------------------------
-  // Center image at x=0, y=0
-  //----------------------------------------------------------------------------
-  pub fn calcOffset(frustum_width: f32, frustum_height: f32) Vec2
-  {
-    return Vec2
-    {
-      .x = -frustum_width / 2.0,
-      .y = frustum_height / 2.0,
-    };
-  }
-
-  //----------------------------------------------------------------------------
   pub fn create(
-    position: Vec3,
+    lookfrom: Vec3,
+    lookat: Vec3,
+    vup: Vec3,
     image_width: u32,
     image_height: u32,
     vertical_fov: f32,
-    aspect_ratio: f32,
-    frustum_dist: f32) Camera
+    aspect_ratio: f32) Camera
   {
     const theta = degreesToRadians(vertical_fov);
-    const h = math.tan(theta / 2.0) * frustum_dist;
+    const h = math.tan(theta / 2.0);
     const frustum_height = 2.0 * h;
     const frustum_width = aspect_ratio * frustum_height;
 
+    const look_dir = lookfrom.subtract(lookat); // -z is forward
+    const w = look_dir.normalized();
+    const u = vup.cross(w).normalized();
+    const v = w.cross(u);
+
+    const half_horiz = u.scale(frustum_width / 2.0);
+    const half_vert = v.scale(frustum_height / 2.0);
+    const top_left_pos = lookfrom.subtract(half_horiz).add(half_vert).subtract(w);
+
+    const px_proj = calcPxToViewport(image_width, image_height, frustum_width, frustum_height);
+
     return Camera
     {
-      .position = position,
-      .scale = calcScale(
-        image_width, image_height, frustum_width, frustum_height),
-      .offset = calcOffset(frustum_width, frustum_height),
-      .frustum_dist = frustum_dist,
+      .position = lookfrom,
+      .top_left = top_left_pos,
+      .horizontal = u,
+      .vertical = v,
+      .px_scale = px_proj,
     };
   }
 
@@ -143,9 +142,9 @@ const Camera = struct
   pub fn calcRay(cam: Camera, col: f32, row: f32, rand: *MyRand) Ray
   {
     // The point that corresponds to on the frustum plane
-    const to_x: f32 = cam.offset.x + ((col + rand.float()) * cam.scale.x);
-    const to_y: f32 = cam.offset.y - ((row + rand.float()) * cam.scale.y);
-    const to_pixel = Vec3{.x = to_x, .y = to_y, .z = -cam.frustum_dist};
+    const u = cam.horizontal.scale((col + rand.float()) * cam.px_scale.x);
+    const v = cam.vertical.scale((row + rand.float()) * cam.px_scale.y);
+    const to_pixel = cam.top_left.add(u).subtract(v);
 
     const ray_dir: Vec3 = to_pixel.subtract(cam.position);
     return Ray{.origin = cam.position, .direction = ray_dir};
@@ -474,13 +473,16 @@ pub fn main() anyerror!void
 
   var rand = MyRand.create();
 
-  const camera_pos = Vec3{.x = 0.0, .y = 0.0, .z = 0.0};
+  const camera_pos = Vec3{.x = -2.0, .y = 2.0, .z = 1.0};
+  const look_at_pos = Vec3{.x = 0.0, .y = 0.0, .z = -1.0};
+  const vup = Vec3{.x = 0.0, .y = 1.0, .z = 0.0};
   const camera = Camera.create(
     camera_pos,
+    look_at_pos,
+    vup,
     image_width, image_height,
-    90.0,
+    20.0,
     @as(f32, image_width) / @as(f32, image_height),
-    Camera.default_frustum_dist
   );
 
   // Output image
