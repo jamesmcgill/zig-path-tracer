@@ -50,14 +50,21 @@ const MyRand = struct
   }
 
   //----------------------------------------------------------------------------
+  pub fn floatRange(self: *MyRand, min: f32, max: f32) f32
+  {
+    const range = max - min;
+    return (self.rng.random.float(f32) * range) + min;
+  }
+
+  //----------------------------------------------------------------------------
   pub fn randomPointFromUnitSphere(self: *MyRand) Vec3
   {
     return while (true)
     {
       const p = Vec3 {
-        .x = (self.float() * 2.0) - 1.0,
-        .y = (self.float() * 2.0) - 1.0,
-        .z = (self.float() * 2.0) - 1.0,
+        .x = self.floatRange(-1.0, 1.0),
+        .y = self.floatRange(-1.0, 1.0),
+        .z = self.floatRange(-1.0, 1.0),
       };
       if (p.lengthSq() < 1.0) { break p; }
     } else p;
@@ -69,8 +76,8 @@ const MyRand = struct
     return while (true)
     {
       const p = Vec3 {
-        .x = (self.float() * 2.0) - 1.0,
-        .y = (self.float() * 2.0) - 1.0,
+        .x = self.floatRange(-1.0, 1.0),
+        .y = self.floatRange(-1.0, 1.0),
         .z = 0.0,
       };
       if (p.lengthSq() < 1.0) { break p; }
@@ -80,6 +87,28 @@ const MyRand = struct
   //----------------------------------------------------------------------------
 
 };
+
+//------------------------------------------------------------------------------
+pub fn randomVec3(rand: *MyRand) Vec3
+{
+  return Vec3
+  {
+    .x = rand.float(),
+    .y = rand.float(),
+    .z = rand.float(),
+  };
+}
+
+//------------------------------------------------------------------------------
+pub fn randomVec3Range(rand: *MyRand, min: f32, max: f32) Vec3
+{
+  return Vec3
+  {
+    .x = rand.floatRange(min, max),
+    .y = rand.floatRange(min, max),
+    .z = rand.floatRange(min, max),
+  };
+}
 
 //------------------------------------------------------------------------------
 const Color = packed struct
@@ -198,7 +227,7 @@ const HitInfo = struct
 //------------------------------------------------------------------------------
 const Scene = struct
 {
-  spheres: []const Sphere,
+  spheres: std.ArrayList(Sphere),
 };
 
 //------------------------------------------------------------------------------
@@ -248,6 +277,108 @@ const basic_scene = Scene
     },
   },
 };
+
+//------------------------------------------------------------------------------
+pub fn appendRandomScene(rand: *MyRand, scene: *Scene) void
+{
+  const ground_material = Material
+  {
+    .Lambertian = .{ .albedo = .{ .x = 0.5, .y = 0.5, .z = 0.5 } },
+  };
+  const glass_material = Material
+  {
+    .Dielectric = .{ .refract_index = 1.5 },
+  };
+  const metal_material = Material
+  {
+    .Metal = .{ .albedo = .{ .x = 0.7, .y = 0.6, .z = 0.5 }, .fuzz = 0.0 },
+  };
+
+  const large_radius = 1.0;
+  const small_radius = 0.2;
+
+  // Large Spheres
+  const ground = Sphere
+  {
+    .position = .{ .x = 0.0, .y = -1000.0, .z = 0.0 },
+    .radius = 1000.0,
+    .material = ground_material,
+  };
+  const metal_sphere = Sphere
+  {
+    .position = .{ .x = 4.0, .y = 1.0, .z = 0.0 },
+    .radius = large_radius,
+    .material = metal_material,
+  };
+  const glass_sphere = Sphere
+  {
+    .position = .{ .x = 0.0, .y = 1.0, .z = 0.0 },
+    .radius = large_radius,
+    .material = glass_material,
+  };
+  const diffuse_sphere = Sphere
+  {
+    .position = .{ .x = -4.0, .y = 1.0, .z = 0.0 },
+    .radius = large_radius,
+    .material = Material
+    {
+      .Lambertian = .{ .albedo = .{ .x = 0.4, .y = 0.2, .z = 0.1 } },
+    },
+  };
+
+  scene.spheres.append(ground) catch |err| return;
+  scene.spheres.append(metal_sphere) catch |err| return;
+  scene.spheres.append(glass_sphere) catch |err| return;
+  scene.spheres.append(diffuse_sphere) catch |err| return;
+
+  // TODO: Why is this position avoided?
+  const avoid_pos = Vec3{ .x = 4.0, .y = 0.2, .z = 0.0 };
+
+  // Small spheres
+  const empty_row = [_]u16{0} ** 22;
+  const grid = [_][22]u16{empty_row} ** 22; // TODO: remove array. only enables for loop
+  for (grid) |*row, u|
+  {
+    for (row) |*pt, v|
+    {
+      // Positions
+      const pos = Vec3
+      {
+        .x = @intToFloat(f32, u) - 11 + rand.floatRange(0.0, 0.9),
+        .y = small_radius,
+        .z = @intToFloat(f32, v) - 11 + rand.floatRange(0.0, 0.9),
+      };
+      if (pos.subtract(avoid_pos).length() <= 0.9) { continue; }
+
+      // Materials
+      const material_choice = rand.float();
+      const material = if (material_choice < 0.8)
+        Material
+        {
+          .Lambertian =
+            .{ .albedo = randomVec3(rand).multiply(randomVec3(rand)) },
+        }
+      else if (material_choice < 0.95)
+        Material
+        {
+          .Metal =
+          .{
+            .albedo = randomVec3Range(rand, 0.5, 1.0),
+            .fuzz = rand.floatRange(0.0, 0.5),
+          },
+        }
+      else
+        glass_material;
+
+      scene.spheres.append(Sphere
+      {
+        .position = pos,
+        .radius = small_radius,
+        .material = material,
+      }) catch |err| return;
+    }
+  }
+}
 
 //------------------------------------------------------------------------------
 const Sphere = struct
@@ -455,7 +586,7 @@ pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) 
   var closest_t: f32 = math.f32_max;
   var hit: HitInfo = undefined;
 
-  for (scene.spheres) |*sphere_ptr|
+  for (scene.spheres.items) |*sphere_ptr|
   {
     if (sphere_ptr.hitTest(ray, 0.001, closest_t)) |info|
     {
@@ -501,31 +632,42 @@ pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) 
 //------------------------------------------------------------------------------
 pub fn main() anyerror!void
 {
-  // Scene to draw
-  const scene_ptr = &basic_scene;
-
   // Output image details
   const image_filename = "test.bmp";
   const image_width: u32 =  1920;
   const image_height: u32 = 1080;
 
   // Rendering parameters
-  const num_samples: u32 = 200;
+  const num_samples: u32 = 500;
   const num_samples_recip: f32 = 1.0 / @as(f32, num_samples);
 
   var rand = MyRand.create();
 
-  const camera_pos = Vec3{.x = 3.0, .y = 3.0, .z = 2.0};
-  const look_at_pos = Vec3{.x = 0.0, .y = 0.0, .z = -1.0};
-  const vup = Vec3{.x = 0.0, .y = 1.0, .z = 0.0};
-  const aperture: f32 = 2.0;
-  const focus_dist = camera_pos.subtract(look_at_pos).length();
+  // Scene
+  // TODO: comptime generation, instead of dynamic array
+  // TODO: is general purpose allocator available yet?
+  //var spheres = std.ArrayList(Sphere).init(std.GeneralPurposeAllocator);
+  var scene = Scene
+  {
+    .spheres = std.ArrayList(Sphere).init(std.testing.allocator),
+  };
+  defer scene.spheres.deinit();
+  appendRandomScene(&rand, &scene);
+  const scene_ptr = &scene;
+
+  // Camera
+  const camera_pos = Vec3{ .x = 13.0, .y = 2.0, .z = 3.0 };
+  const look_at_pos = Vec3{ .x = 0.0, .y = 0.0, .z = 0.0 };
+  const vup = Vec3{ .x = 0.0, .y = 1.0, .z = 0.0 };
+  const aperture: f32 = 0.1;
+  const focus_dist = 10.0;
   const camera = Camera.create(
     camera_pos,
     look_at_pos,
     vup,
-    image_width, image_height,
-    90.0,
+    image_width,
+    image_height,
+    120.0,
     @as(f32, image_width) / @as(f32, image_height),
     aperture,
     focus_dist,
@@ -559,7 +701,6 @@ pub fn main() anyerror!void
     item.blue = @floatToInt(u8, color.z * 255.0);
     item.alpha = 0xFF;
   }
-  std.debug.warn("Render Time: {d:.3}s\n", .{@intToFloat(f32, timer.read()) / time.ns_per_s});
 
   // Save the image to a file
   var ret = c_import.stbi_write_bmp(
@@ -575,6 +716,8 @@ pub fn main() anyerror!void
   } else {
     std.debug.warn("Successfuly written file: {}\n", .{image_filename});
   }
+
+  std.debug.warn("Render Time: {d:.3}s\n", .{@intToFloat(f32, timer.read()) / time.ns_per_s});
 }
 
 //------------------------------------------------------------------------------
