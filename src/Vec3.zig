@@ -150,7 +150,7 @@ pub const Vec3 = struct {
 
     //--------------------------------------------------------------------------
     pub fn refractTheta(self: Vec3, in_cos_theta: f32, surface_normal: Vec3, ni_over_nt: f32) Vec3 {
-        assert(math.approxEq(f32, 1.0, self.lengthSq(), 0.000001)); // self must be normalized
+        assert(math.approxEqAbs(f32, 1.0, self.lengthSq(), 0.000001)); // self must be normalized
         const in_ortho_len = surface_normal.scale(in_cos_theta);
         const ortho = self.add(in_ortho_len).scale(ni_over_nt);
 
