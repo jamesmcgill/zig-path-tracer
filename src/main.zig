@@ -2,15 +2,13 @@ const c_import = @cImport({
     @cInclude("stb_image_write.h");
 });
 const std = @import("std");
-const math = @import("std").math;
-const time = @import("std").time;
 
 const Vec3 = @import("Vec3.zig").Vec3;
 const Ray = @import("Ray.zig").Ray;
 
 //------------------------------------------------------------------------------
 pub fn degreesToRadians(degrees: f32) f32 {
-    return (degrees * math.pi) / 180.0;
+    return (degrees * std.math.pi) / 180.0;
 }
 
 //------------------------------------------------------------------------------
@@ -122,6 +120,8 @@ const Camera = struct {
     w: Vec3,
     lens_radius: f32,
     px_scale: Vec2,
+    time0: f32,
+    time1: f32,
 
     //----------------------------------------------------------------------------
     // Scale image (screen) to world space
@@ -144,9 +144,11 @@ const Camera = struct {
         aspect_ratio: f32,
         aperture: f32,
         focus_dist: f32,
+        time0: f32,
+        time1: f32,
     ) Camera {
         const theta = degreesToRadians(vertical_fov);
-        const h = math.tan(theta / 2.0);
+        const h = std.math.tan(theta / 2.0);
         const frustum_height = 2.0 * h;
         const frustum_width = aspect_ratio * frustum_height;
 
@@ -173,6 +175,8 @@ const Camera = struct {
             .w = w,
             .lens_radius = aperture / 2.0,
             .px_scale = px_proj,
+            .time0 = time0,
+            .time1 = time1,
         };
     }
 
@@ -191,7 +195,7 @@ const Camera = struct {
 
         const ray_start = cam.position.add(aperture_offset);
         const ray_dir = to_pixel.subtract(ray_start);
-        return Ray{ .origin = ray_start, .direction = ray_dir };
+        return Ray{ .origin = ray_start, .direction = ray_dir, .time = rand.floatRange(cam.time0, cam.time1) };
     }
 };
 
@@ -212,11 +216,11 @@ const Scene = struct {
 //------------------------------------------------------------------------------
 const basic_scene = Scene{
     .spheres = &[_]Sphere{
-        .{ .position = .{ .x = 0.0, .y = -100.5, .z = -1.0 }, .radius = 100.0, .material = .{ .Lambertian = .{ .albedo = .{ .x = 0.8, .y = 0.8, .z = 0.0 } } } },
-        .{ .position = .{ .x = 0.0, .y = 0.0, .z = -1.0 }, .radius = 0.5, .material = .{ .Lambertian = .{ .albedo = .{ .x = 0.1, .y = 0.2, .z = 0.5 } } } },
-        .{ .position = .{ .x = 1.0, .y = 0.0, .z = -1.0 }, .radius = 0.5, .material = .{ .Metal = .{ .albedo = .{ .x = 0.8, .y = 0.6, .z = 0.2 }, .fuzz = 0.0 } } },
-        .{ .position = .{ .x = -1.0, .y = 0.0, .z = -1.0 }, .radius = 0.5, .material = .{ .Dielectric = .{ .refract_index = 1.5 } } },
-        .{ .position = .{ .x = -1.0, .y = 0.0, .z = -1.0 }, .radius = -0.45, .material = .{ .Dielectric = .{ .refract_index = 1.5 } } },
+        .{ .position0 = .{ .x = 0.0, .y = -100.5, .z = -1.0 }, .position1 = .{ .x = 0.0, .y = -100.5, .z = -1.0 }, .radius = 100.0, .material = .{ .Lambertian = .{ .albedo = .{ .x = 0.8, .y = 0.8, .z = 0.0 } } }, .time0 = 0.0, .time1 = 1.0 },
+        .{ .position0 = .{ .x = 0.0, .y = 0.0, .z = -1.0 }, .position1 = .{ .x = 0.0, .y = 0.0, .z = -1.0 }, .radius = 0.5, .material = .{ .Lambertian = .{ .albedo = .{ .x = 0.1, .y = 0.2, .z = 0.5 } } }, .time0 = 0.0, .time1 = 1.0 },
+        .{ .position0 = .{ .x = 1.0, .y = 0.0, .z = -1.0 }, .position0 = .{ .x = 1.0, .y = 0.0, .z = -1.0 }, .radius = 0.5, .material = .{ .Metal = .{ .albedo = .{ .x = 0.8, .y = 0.6, .z = 0.2 }, .fuzz = 0.0 }, .time0 = 0.0, .time1 = 1.0 } },
+        .{ .position0 = .{ .x = -1.0, .y = 0.0, .z = -1.0 }, .position0 = .{ .x = -1.0, .y = 0.0, .z = -1.0 }, .radius = 0.5, .material = .{ .Dielectric = .{ .refract_index = 1.5 } }, .time0 = 0.0, .time1 = 1.0 },
+        .{ .position0 = .{ .x = -1.0, .y = 0.0, .z = -1.0 }, .position0 = .{ .x = -1.0, .y = 0.0, .z = -1.0 }, .radius = -0.45, .material = .{ .Dielectric = .{ .refract_index = 1.5 } }, .time0 = 0.0, .time1 = 1.0 },
     },
 };
 
@@ -237,26 +241,38 @@ pub fn appendRandomScene(rand: *MyRand, scene: *Scene) void {
 
     // Large Spheres
     const ground = Sphere{
-        .position = .{ .x = 0.0, .y = -1000.0, .z = 0.0 },
+        .position0 = .{ .x = 0.0, .y = -1000.0, .z = 0.0 },
+        .position1 = .{ .x = 0.0, .y = -1000.0, .z = 0.0 },
         .radius = 1000.0,
         .material = ground_material,
+        .time0 = 0.0,
+        .time1 = 0.0,
     };
     const metal_sphere = Sphere{
-        .position = .{ .x = 4.0, .y = 1.0, .z = 0.0 },
+        .position0 = .{ .x = 4.0, .y = 1.0, .z = 0.0 },
+        .position1 = .{ .x = 4.0, .y = 1.0, .z = 0.0 },
         .radius = large_radius,
         .material = metal_material,
+        .time0 = 0.0,
+        .time1 = 0.0,
     };
     const glass_sphere = Sphere{
-        .position = .{ .x = 0.0, .y = 1.0, .z = 0.0 },
+        .position0 = .{ .x = 0.0, .y = 1.0, .z = 0.0 },
+        .position1 = .{ .x = 0.0, .y = 1.0, .z = 0.0 },
         .radius = large_radius,
         .material = glass_material,
+        .time0 = 0.0,
+        .time1 = 0.0,
     };
     const diffuse_sphere = Sphere{
-        .position = .{ .x = -4.0, .y = 1.0, .z = 0.0 },
+        .position0 = .{ .x = -4.0, .y = 1.0, .z = 0.0 },
+        .position1 = .{ .x = -4.0, .y = 1.0, .z = 0.0 },
         .radius = large_radius,
         .material = Material{
             .Lambertian = .{ .albedo = .{ .x = 0.4, .y = 0.2, .z = 0.1 } },
         },
+        .time0 = 0.0,
+        .time1 = 0.0,
     };
 
     scene.spheres.append(ground) catch return;
@@ -274,22 +290,25 @@ pub fn appendRandomScene(rand: *MyRand, scene: *Scene) void {
         for (row) |*pt, v| {
             _ = pt;
             // Positions
-            const pos = Vec3{
+            const pos0 = Vec3{
                 .x = @intToFloat(f32, u) - 11 + rand.floatRange(0.0, 0.9),
                 .y = small_radius,
                 .z = @intToFloat(f32, v) - 11 + rand.floatRange(0.0, 0.9),
             };
-            if (pos.subtract(avoid_pos).length() <= 0.9) {
+            if (pos0.subtract(avoid_pos).length() <= 0.9) {
                 continue;
             }
 
             // Materials
             const material_choice = rand.float();
-            const material = if (material_choice < 0.8)
+            const is_lambertian = (material_choice < 0.8);
+            const is_metal = (material_choice < 0.95);
+
+            const material = if (is_lambertian)
                 Material{
                     .Lambertian = .{ .albedo = randomVec3(rand).multiply(randomVec3(rand)) },
                 }
-            else if (material_choice < 0.95)
+            else if (is_metal)
                 Material{
                     .Metal = .{
                         .albedo = randomVec3Range(rand, 0.5, 1.0),
@@ -299,24 +318,53 @@ pub fn appendRandomScene(rand: *MyRand, scene: *Scene) void {
             else
                 glass_material;
 
+            const pos1 = if (is_lambertian)
+                Vec3{ .x = pos0.x, .y = pos0.y + rand.floatRange(0.0, 0.5), .z = pos0.z }
+            else
+                pos0;
+
+            const t1: f32 = if (is_lambertian) 1.0 else 0.0;
+
             scene.spheres.append(Sphere{
-                .position = pos,
+                .position0 = pos0,
+                .position1 = pos1,
                 .radius = small_radius,
                 .material = material,
+                .time0 = 0.0,
+                .time1 = t1,
             }) catch return;
         }
     }
 }
 
 //------------------------------------------------------------------------------
+pub fn lerp(t: f32, v0: Vec3, v1: Vec3) Vec3 {
+    std.debug.assert(t >= 0.0 and t <= 1.0);
+
+    const v_diff = v1.subtract(v0);
+    return v0.add(v_diff.scale(t));
+}
+
+//------------------------------------------------------------------------------
 const Sphere = struct {
-    position: Vec3,
+    position0: Vec3,
+    position1: Vec3,
+    time0: f32,
+    time1: f32,
     radius: f32,
     material: Material,
 
     //----------------------------------------------------------------------------
+    pub fn positionAtTime(self: Sphere, time: f32) Vec3 {
+        if (self.time0 == self.time1) return self.position0;
+
+        const t: f32 = (time - self.time0) / (self.time1 - self.time0);
+        return lerp(t, self.position0, self.position1);
+    }
+
+    //----------------------------------------------------------------------------
     pub fn hitTest(self: Sphere, ray: Ray, t_min: f32, t_max: f32) ?HitInfo {
-        const displacement = ray.origin.subtract(self.position);
+        const displacement = ray.origin.subtract(self.positionAtTime(ray.time));
 
         const a: f32 = ray.direction.lengthSq();
         const half_b: f32 = Vec3.dot(displacement, ray.direction);
@@ -327,13 +375,13 @@ const Sphere = struct {
             return null;
         }
 
-        const discrim_root = math.sqrt(discriminant);
+        const discrim_root = std.math.sqrt(discriminant);
         const t1 = (-half_b - discrim_root) / a;
         const t2 = (-half_b + discrim_root) / a;
 
         if (closestValidT(t1, t2, t_min, t_max)) |t| {
             const point_at_t = ray.pointAtT(t);
-            const outward_normal = point_at_t.subtract(self.position)
+            const outward_normal = point_at_t.subtract(self.positionAtTime(ray.time))
                 .divideScalar(self.radius);
 
             return HitInfo{
@@ -417,6 +465,7 @@ const LambertianMaterial = struct {
             .ray = Ray{
                 .origin = hit.point,
                 .direction = reflect_point.subtract(hit.point),
+                .time = ray.time,
             },
             .attenuation = self.albedo,
         };
@@ -439,7 +488,11 @@ const MetalMaterial = struct {
         const scattered_dir = reflected_dir.add(fuzz_offset);
         if (scattered_dir.dot(hit.surface_normal) > 0.0) {
             return ScatterInfo{
-                .ray = Ray{ .origin = hit.point, .direction = scattered_dir },
+                .ray = Ray{
+                    .origin = hit.point,
+                    .direction = scattered_dir,
+                    .time = ray.time,
+                },
                 .attenuation = self.albedo,
             };
         }
@@ -455,7 +508,7 @@ const DielectricMaterial = struct {
     pub fn schlick(cos_theta: f32, refract_index: f32) f32 {
         const r = (1.0 - refract_index) / (1.0 + refract_index);
         const r0 = r * r;
-        return r0 + (1.0 - r0) * math.pow(f32, (1.0 - cos_theta), 5.0);
+        return r0 + (1.0 - r0) * std.math.pow(f32, (1.0 - cos_theta), 5.0);
     }
 
     pub fn scatter(
@@ -477,8 +530,8 @@ const DielectricMaterial = struct {
 
         // Obtain sin theta to check for total internal reflection
         const unit_v = ray.direction.normalized();
-        const cos_theta = math.min(unit_v.scale(-1.0).dot(surface_normal), 1.0);
-        const sin_theta = math.sqrt(1.0 - cos_theta * cos_theta);
+        const cos_theta = std.math.min(unit_v.scale(-1.0).dot(surface_normal), 1.0);
+        const sin_theta = std.math.sqrt(1.0 - cos_theta * cos_theta);
 
         const will_reflect: bool = ((ni_over_nt * sin_theta > 1.0) or (schlick(cos_theta, ni_over_nt) > rand.float()));
 
@@ -488,7 +541,11 @@ const DielectricMaterial = struct {
             unit_v.refractTheta(cos_theta, surface_normal, ni_over_nt);
 
         return ScatterInfo{
-            .ray = Ray{ .origin = hit.point, .direction = scattered_dir },
+            .ray = Ray{
+                .origin = hit.point,
+                .direction = scattered_dir,
+                .time = ray.time,
+            },
             .attenuation = Vec3{ .x = 1.0, .y = 1.0, .z = 1.0 },
         };
     }
@@ -502,7 +559,7 @@ pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) 
 
     // Test all objects in the scene
     var hit_something: bool = false;
-    var closest_t: f32 = math.f32_max;
+    var closest_t: f32 = std.math.f32_max;
     var hit: HitInfo = undefined;
 
     for (scene.spheres.items) |*sphere_ptr| {
@@ -540,11 +597,12 @@ pub fn calcColor(ray: Ray, scene: *const Scene, rand: *MyRand, call_depth: u32) 
 pub fn main() anyerror!void {
     // Output image details
     const image_filename = "test.bmp";
-    const image_width: u32 = 1920;
-    const image_height: u32 = 1080;
+    const aspect_ratio = 16.0 / 9.0;
+    const image_width: u32 = 400;
+    const image_height: u32 = @as(u32, @as(f32, image_width) / aspect_ratio);
 
     // Rendering parameters
-    const num_samples: u32 = 50;
+    const num_samples: u32 = 100;
     const num_samples_recip: f32 = 1.0 / @as(f32, num_samples);
 
     var rand = MyRand.create();
@@ -565,6 +623,7 @@ pub fn main() anyerror!void {
     const look_at_pos = Vec3{ .x = 0.0, .y = 0.0, .z = 0.0 };
     const vup = Vec3{ .x = 0.0, .y = 1.0, .z = 0.0 };
     const aperture: f32 = 0.1;
+    const fov: f32 = 120.0;
     const focus_dist = 10.0;
     const camera = Camera.create(
         camera_pos,
@@ -572,17 +631,19 @@ pub fn main() anyerror!void {
         vup,
         image_width,
         image_height,
-        120.0,
-        @as(f32, image_width) / @as(f32, image_height),
+        fov,
+        aspect_ratio,
         aperture,
         focus_dist,
+        0.0,
+        1.0,
     );
 
     // Output image
     var pixels: [image_width * image_height]Color = undefined;
 
     std.debug.print("Reticulating splines...\n", .{});
-    var timer = try time.Timer.start();
+    var timer = try std.time.Timer.start();
     for (pixels) |*item, it| {
         const pix = @intCast(u32, it);
 
@@ -614,7 +675,7 @@ pub fn main() anyerror!void {
         std.debug.print("Successfuly written file: {s}\n", .{image_filename});
     }
 
-    std.debug.print("Render Time: {d:.3}s\n", .{@intToFloat(f32, timer.read()) / time.ns_per_s});
+    std.debug.print("Render Time: {d:.3}s\n", .{@intToFloat(f32, timer.read()) / std.time.ns_per_s});
 }
 
 //------------------------------------------------------------------------------
